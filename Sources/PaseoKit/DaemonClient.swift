@@ -34,6 +34,7 @@ public enum DaemonEvent: Sendable {
     case permissionRequested(AgentPermissionRequestPayload)
     case permissionResolved(AgentPermissionResolvedPayload)
     case serverInfo(ServerInfo)
+    case terminalsChanged(TerminalsChanged)
     case disconnected(String?)
 }
 
@@ -84,6 +85,7 @@ public actor DaemonClient {
     private var lastInbound = Date()
     private var closed = false
     public private(set) var serverInfo: ServerInfo?
+    var terminalStreams = TerminalStreamRegistry()
 
     public static let capabilities: JSONValue = [
         "hello_rejection": true,
@@ -92,6 +94,7 @@ public actor DaemonClient {
         "selective_agent_timeline": true,
         "timeline_notifications": true,
         "all_providers": true,
+        "terminal_reflowable_snapshot": true,
     ]
 
     /// Whether this client reaches the daemon directly or through the E2EE relay.
@@ -223,8 +226,9 @@ public actor DaemonClient {
             do {
                 let message = try await transport.receive()
                 lastInbound = Date()
-                if case .text(let text) = message {
-                    handleFrame(Data(text.utf8))
+                switch message {
+                case .text(let text): handleFrame(Data(text.utf8))
+                case .binary(let data): handleBinaryFrame(data)
                 }
             } catch {
                 teardown(reason: closed ? nil : error.localizedDescription)
@@ -239,6 +243,7 @@ public actor DaemonClient {
         closed = true
         receiveLoop?.cancel()
         pingLoop?.cancel()
+        terminalStreams.finishAll()
         let waiting = pending
         pending.removeAll()
         for continuation in waiting.values {
@@ -256,6 +261,12 @@ public actor DaemonClient {
               header.type == "session", let message = header.message
         else { return }
 
+        if message.type == "subscribe_terminal_response", let requestId = message.payload?.requestId,
+           let response = try? decoder.decode(SessionFrame<SubscribeTerminalResponse>.self, from: data)
+        {
+            terminalStreams.bindAttach(requestId: requestId, response: response.message.payload)
+        }
+
         if let requestId = message.payload?.requestId, let continuation = pending.removeValue(forKey: requestId) {
             if message.type == "rpc_error" {
                 let error = (try? decoder.decode(SessionFrame<RpcErrorPayload>.self, from: data))?.message.payload
@@ -270,6 +281,11 @@ public actor DaemonClient {
             (try? decoder.decode(SessionFrame<P>.self, from: data))?.message.payload
         }
 
+        if message.type == "terminal_stream_exit" {
+            if let payload = decode(TerminalStreamExitPayload.self) { terminalStreams.exit(payload) }
+            return
+        }
+
         let event: DaemonEvent? = switch message.type {
         case "agent_stream": decode(AgentStreamPayload.self).map(DaemonEvent.agentStream)
         case "agent_update": decode(AgentUpdate.self).map(DaemonEvent.agentUpdate)
@@ -277,9 +293,15 @@ public actor DaemonClient {
         case "agent_permission_request": decode(AgentPermissionRequestPayload.self).map(DaemonEvent.permissionRequested)
         case "agent_permission_resolved": decode(AgentPermissionResolvedPayload.self).map(DaemonEvent.permissionResolved)
         case "status" where message.payload?.status == "server_info": decode(ServerInfo.self).map(DaemonEvent.serverInfo)
+        case "terminals_changed": decode(TerminalsChanged.self).map(DaemonEvent.terminalsChanged)
         default: nil
         }
         if let event { eventContinuation.yield(event) }
+    }
+
+    private func handleBinaryFrame(_ data: Data) {
+        guard let frame = TerminalStreamFrame(decoding: data) else { return }
+        terminalStreams.route(frame)
     }
 
     // MARK: Requests
@@ -294,6 +316,12 @@ public actor DaemonClient {
         try await transport.send(.text(String(decoding: data, as: UTF8.self)))
     }
 
+    /// Sends a binary WebSocket frame (terminal stream input/resize).
+    func sendBinary(_ data: Data) async throws {
+        guard let transport, !closed else { throw PaseoError.disconnected }
+        try await transport.send(.binary(data))
+    }
+
     /// Sends a session message without waiting for a reply.
     public func send(_ message: [String: JSONValue]) async throws {
         try await sendRaw(["type": "session", "message": .object(message)])
@@ -302,7 +330,7 @@ public actor DaemonClient {
     /// Sends a session request and returns the raw frame of its correlated response.
     public func requestData(_ message: [String: JSONValue], timeout: Duration = .seconds(60)) async throws -> Data {
         guard transport != nil, !closed else { throw PaseoError.disconnected }
-        let requestId = UUID().uuidString.lowercased()
+        let requestId = message["requestId"]?.stringValue ?? UUID().uuidString.lowercased()
         var message = message
         message["requestId"] = .string(requestId)
         let envelope: JSONValue = ["type": "session", "message": .object(message)]
