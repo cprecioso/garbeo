@@ -5,7 +5,7 @@ import PaseoKit
 /// Where a session writes daemon output. Implemented by the emulator view.
 @MainActor
 protocol TerminalOutputSink: AnyObject {
-    /// Clears the emulator (RIS) and paints `data`; input the emulator generates meanwhile must be dropped.
+    /// Clears the emulator (RIS) and paints `data`.
     func restore(_ data: Data)
     func write(_ data: Data)
 }
@@ -40,7 +40,8 @@ public final class TerminalSession {
     @ObservationIgnored private var hasClaimed = false
     @ObservationIgnored private var claimPending = false
     @ObservationIgnored private var lastClaim = ContinuousClock.now
-    @ObservationIgnored private var restoring = false
+    @ObservationIgnored private var restoreFilter = RestoreReplyFilter()
+    @ObservationIgnored private var restoreGeneration = 0
 
     public init(client: DaemonClient, terminalId: String) {
         self.client = client
@@ -93,9 +94,7 @@ public final class TerminalSession {
             for await event in attachment.events {
                 switch event {
                 case .restore(let data, _):
-                    restoring = true
-                    sink?.restore(data)
-                    restoring = false
+                    restore(data)
                 case .output(let data):
                     sink?.write(data)
                 }
@@ -110,11 +109,24 @@ public final class TerminalSession {
         }
     }
 
+    private func restore(_ data: Data) {
+        restoreFilter.beginRestore()
+        restoreGeneration += 1
+        let generation = restoreGeneration
+        sink?.restore(data)
+        sink?.write(RestoreReplyFilter.barrierQuery)
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard let self, self.restoreGeneration == generation else { return }
+            self.restoreFilter.timeOut()
+        }
+    }
+
     // MARK: Emulator callbacks
 
     /// Bytes the emulator produced from keyboard input, paste, or terminal query replies.
     func send(_ data: Data) {
-        guard !restoring, !data.isEmpty, let attachment else { return }
+        guard let data = restoreFilter.filter(data), !data.isEmpty, let attachment else { return }
         // Typing is direct interaction: re-claim if another client may have taken the size since.
         if ContinuousClock.now - lastClaim > .seconds(5) { claimSize() }
         enqueue { try await $0.sendTerminalInput(attachment, data: data) }

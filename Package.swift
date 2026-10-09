@@ -11,9 +11,9 @@ let package = Package(
     dependencies: [
         // libsodium: Curve25519 + XSalsa20-Poly1305 (NaCl box) for relay E2EE. CryptoKit has no XSalsa20.
         .package(url: "https://github.com/jedisct1/swift-sodium.git", from: "0.11.0"),
-        // Pinned below 1.12: 1.12+ compiles a Metal shader (needs Xcode's optional Metal toolchain)
-        // and 1.19+ adds a build-tool plugin that Xcode requires every user to trust.
-        .package(url: "https://github.com/migueldeicaza/SwiftTerm", .upToNextMinor(from: "1.11.2")),
+        // 1.99 is the 2.0 preview; pinned exactly until 2.0 ships. Its build-tool plugin must be trusted once
+        // in Xcode ("Trust & Enable"), or pass `-skipPackagePluginValidation` to xcodebuild.
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.99.0"),
     ],
     targets: [
         .target(
@@ -26,5 +26,6 @@ let package = Package(
             dependencies: ["PaseoKit"],
             resources: [.copy("Resources"), .copy("Fixtures")]
         ),
+        .testTarget(name: "PaseoTerminalTests", dependencies: ["PaseoTerminal", .product(name: "SwiftTerm", package: "SwiftTerm")]),
     ]
 )
