@@ -15,6 +15,7 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Create agents: workspace, provider, model, thinking level, mode, prompt
 - Workspace terminals: listed per workspace in the sidebar (live via `terminals_changed`), opened in a real terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with keyboard input, screen restore on attach, resize, new and kill. On iOS, SwiftTerm's accessory bar provides esc, ctrl, tab, and arrow keys
 - Automatic reconnect with backoff; ping/pong liveness lease
+- Plugin UI: screens, workspace/agent panels, sidebar items and Command Center items from [Paseo plugins](https://paseo.sh/docs/plugins) run unmodified in WKWebView panes (see [Plugins](#plugins))
 
 ## Layout
 
@@ -31,6 +32,7 @@ Sources/PaseoKit/
   TimelineSubscriptions.swift  per-agent live timelines for every visible agent; serialized set_subscription
   TerminalFrames.swift   terminal binary frame codec, snapshot → ANSI renderer
   Terminals.swift        terminal requests, slot-routed output streams
+  Plugins.swift          plugin list/catalog/RPC requests and catalog-change events
 Sources/PaseoTerminal/   PaseoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
 Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
   Resources/relay-vectors.json  known-answer vectors generated from the upstream TypeScript
@@ -41,6 +43,9 @@ scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
 App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Bonsplit linked on macOS only)
 App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner
   Workspace/             workspace tabs: tab content model, saved layout, Bonsplit integration (macOS)
+  Plugins/               PluginStore, WKWebView runtime + bridge, PluginPaneView, PluginTab, sidebar/menu entries
+  PluginHost/plugin-host.js  generated JS host runtime (do not edit)
+PluginHost/              source of the JS host runtime (React, react-native-web, Paseo plugin SDK)
 ```
 
 ## Workspace tabs and panes (macOS)
@@ -67,7 +72,7 @@ Requires Xcode 16+ (tested with Xcode 27), macOS 15 / iOS 18.
 
 ```sh
 swift test                                      # unit tests (PaseoKit + PaseoTerminal)
-PASEO_LIVE_URL=127.0.0.1:6767 swift test        # + read-only checks against a running daemon
+PASEO_LIVE_URL=127.0.0.1:6767 swift test        # + read-only checks against a running daemon (incl. plugin list/catalog)
 PASEO_LIVE_URL=127.0.0.1:6767 PASEO_LIVE_WRITE=1 swift test   # + creates real agents (cheap model)
 ```
 
@@ -111,6 +116,27 @@ Relay connections (`packages/relay`, `packages/protocol/src/connection-offer.ts`
 - Frames: `[24-byte nonce][box]` with the `box.before` key. With `binaryCiphertext` negotiated, app text is a base64 text frame and app binary a raw binary frame; legacy peers get base64 text for both. Any other plaintext JSON after the handshake, or a frame that fails authentication, closes the socket
 - The regular `hello` (including the password) then runs inside the encrypted channel. Over the relay, a wrong password shows up as a disconnect (the daemon's `hello.rejected` is lost behind its close), which the client reports as a likely password problem
 
+## Plugins
+
+Upstream Paseo has no webview contract for plugins. The daemon compiles each plugin's `index.client.tsx` into a CommonJS bundle and ships it in `plugin.catalog.get.response`; the official app `eval`s it with a `require` that hands out its own React, React Native, TanStack Query, zod and `@getpaseo/plugin` modules, then renders the contributed components in its own tree. This client does the same inside a WKWebView:
+
+- `PluginHost/` is a small JS host (React 19.1 + react-native-web + the Paseo plugin/client SDK) that ports upstream's `runPluginClientBundle`, its `require` map, providers (`QueryClientProvider`, `PaseoApiProvider`, `PluginRpcProvider`, `PluginClientStateProvider`) and the host-supplied modules (`@getpaseo/plugin/client/ui`, `/client/react-native`, `useSettings`, `useHosts`, Lucide icons by name). It is bundled into `App/PaseoSwift/PluginHost/plugin-host.js`, which is committed so the app builds without Node.
+- A hidden **registry** page per connection runs every client bundle, reports contributions (screens, panels, Command Center items, settings screens) and renders sidebar items headlessly: the rows a plugin draws with `SidebarRow` show up as native rows under **Plugins** in the sidebar, and presses run the plugin's own `onPress`.
+- Each open **pane** (`PluginPaneView`, a self-contained view any container can host) runs its own page that renders one screen or panel with the upstream props (`theme`, `host`, `layout`, `navigation`, `params` / `workspaceId` / `agentId`).
+- Bridge: pages are served from `paseo-plugin://host/` by a `WKURLSchemeHandler`; navigation anywhere else is cancelled and http(s) links open in the system browser. The init payload (bundles, target, theme from native semantic colors, workspace/agent snapshots) is injected with a `WKUserScript`; JS calls the app through a `WKScriptMessageHandlerWithReply`. `useRpc` / `ctx.rpc` go through the app's own connection as `plugin.rpc.invoke.request`. `usePaseo()` gets a real `@getpaseo/client` `PaseoApi` whose socket the app opens natively with the connection's own transport (direct or relay E2EE) and relays (the daemon rejects WebSocket upgrades from unlisted origins, which includes the custom scheme).
+- `status.plugin_catalog_changed` reloads the catalog and rebuilds pages; `status.plugin_settings_changed` refreshes `useSettings`.
+
+Where they show up: sidebar items, legacy sidebar items and global commands in the sidebar's **Plugins** section; workspace panels and workspace commands in a workspace row's context menu (and, on macOS, the workspace's Open Tab menu); workspace/agent panels and commands in the agent toolbar's **Plugins** menu. On macOS, workspace panels open as workspace tabs (`PluginTab`) and screens in the detail column; on iOS both open in the detail column (a sheet on iPhone).
+
+Not supported yet: composer pills, header buttons, slash commands, attachment sources, themes, timeline transformers/renderers, sidebar popovers (they register without error but don't render), and the `paseo` version check on `requirements`.
+
+Rebuilding the JS host (needs Node and a getpaseo/paseo checkout at the pinned commit in `PluginHost/build.mjs`; the SDK is compiled from source rather than npm):
+
+```sh
+git clone https://github.com/getpaseo/paseo /tmp/paseo-src/paseo   # then check out the pinned ref
+cd PluginHost && npm install && PASEO_SRC=/tmp/paseo-src/paseo npm run build
+```
+
 ## Not yet supported
 
 - Opening `https://app.paseo.sh/#offer=…` links from other apps (needs associated domains); paste or scan them instead
@@ -130,3 +156,4 @@ Relay connections (`packages/relay`, `packages/protocol/src/connection-offer.ts`
 - `-PaseoTerminalPassive YES` (macOS) terminal tabs never take focus, so attaching never claims the PTY size (for read-only runs against a live daemon)
 - `-PaseoSplit horizontal[:0.3][,vertical…]` (macOS) splits the focused pane per entry and moves a hidden tab into each new pane, as a drag would
 - `-PaseoSnapshot /path/prefix` writes a state summary (visible timelines, subscription, workspace layout) and on macOS a window PNG after launch
+- `-PaseoOpenPluginPane <pluginId>/screen/<id>` | `<pluginId>/panel/<id>[/<workspaceId>]` | `sidebar:<row label>` | `command:<pluginId>/<commandId>` opens a plugin pane once contributions load; `-PaseoPluginPress <aria-label prefix>` clicks inside it; with `-PaseoSnapshot` this writes `<prefix>-plugin.png` and `<prefix>-plugin.txt` (contributions and the bridge RPC log)

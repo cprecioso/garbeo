@@ -118,7 +118,7 @@ extension DaemonEndpoint {
         transportKind == .relay ? try PairingLink.parse(url).connection : nil
     }
 
-    func makeTransport(session: URLSession) throws -> any DaemonTransport {
+    public func makeTransport(session: URLSession) throws -> any DaemonTransport {
         guard let relay = try relayConnection() else {
             return WebSocketTransport(url: try webSocketURL(), session: session)
         }

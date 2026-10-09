@@ -13,11 +13,13 @@ import SwiftUI
 enum WorkspaceTabContent: Hashable, Codable, Sendable {
     case agent(AgentTab)
     case terminal(TerminalTab)
+    case plugin(PluginTab)
 
     var kind: any WorkspaceTabKind {
         switch self {
         case .agent(let tab): tab
         case .terminal(let tab): tab
+        case .plugin(let tab): tab
         }
     }
 
@@ -30,6 +32,7 @@ enum WorkspaceTabContent: Hashable, Codable, Sendable {
         switch self {
         case .agent(let tab): .agent(tab.agentId)
         case .terminal(let tab): .terminal(tab.terminalId)
+        case .plugin: nil
         }
     }
 }

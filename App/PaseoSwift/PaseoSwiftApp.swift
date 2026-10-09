@@ -74,6 +74,8 @@ struct MainView: View {
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     #if os(macOS)
     @State private var workspaceTabs = WorkspaceTabsRegistry()
+    #else
+    @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
 
     var body: some View {
@@ -83,7 +85,9 @@ struct MainView: View {
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             #if os(macOS)
-            if let workspace = model.selectedWorkspace {
+            if let pane = model.plugins.activePane {
+                PluginPaneDetail(target: pane)
+            } else if let workspace = model.selectedWorkspace {
                 WorkspaceView(
                     workspace: workspace, tabs: workspaceTabs.tabs(for: workspace, model: model),
                     showingNewAgent: $showingNewAgent)
@@ -98,7 +102,9 @@ struct MainView: View {
                 EmptyDetailView(showingNewAgent: $showingNewAgent)
             }
             #else
-            if let terminal = model.terminals.selectedTerminal {
+            if let pane = model.plugins.activePane, sizeClass != .compact {
+                PluginPaneDetail(target: pane)
+            } else if let terminal = model.terminals.selectedTerminal {
                 TerminalDetailView(terminal: terminal)
                     .id(terminal.id)
             } else if let agent = model.selectedAgent {
@@ -112,6 +118,20 @@ struct MainView: View {
         .sheet(isPresented: $showingNewAgent) {
             NewAgentView()
         }
+        #if os(iOS)
+        // Compact iPhone layouts show the sidebar alone, so plugin panes open as a sheet there.
+        .sheet(item: Binding(
+            get: { sizeClass == .compact ? model.plugins.activePane : nil },
+            set: { model.plugins.activePane = $0 }
+        )) { pane in
+            NavigationStack { PluginPaneDetail(target: pane) }
+                .environment(model)
+        }
+        #endif
+        .onChange(of: model.selection) { _, selection in
+            if selection != nil { model.plugins.activePane = nil }
+        }
+        .background(PluginRegistryHost())
     }
 }
 
