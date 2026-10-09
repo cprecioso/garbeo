@@ -6,7 +6,7 @@ import Foundation
 import PaseoKit
 
 /// Development aid: launch with `-PaseoSnapshot /path/prefix` to write PNGs of the key window
-/// (and a state summary) a few seconds after launch, and again after `-PaseoSelectAgent` applies.
+/// (and a state summary) a few seconds after launch, and again after `-PaseoSelectAgent`/`-PaseoSelectTerminal` applies.
 @MainActor
 enum DebugSnapshot {
     static func scheduleIfRequested(model: AppModel) {
@@ -14,10 +14,23 @@ enum DebugSnapshot {
         Task {
             try? await Task.sleep(for: .seconds(4))
             capture(to: prefix + "-1.png", model: model)
-            if UserDefaults.standard.string(forKey: "PaseoSelectAgent") != nil {
+            if UserDefaults.standard.string(forKey: "PaseoSelectAgent") != nil
+                || UserDefaults.standard.string(forKey: "PaseoSelectTerminal") != nil
+            {
                 try? await Task.sleep(for: .seconds(4))
                 capture(to: prefix + "-2.png", model: model)
             }
+            #if os(macOS)
+            // `-PaseoResizeWindow 900x500` then resizes the window and captures once more.
+            if let size = UserDefaults.standard.string(forKey: "PaseoResizeWindow")?.split(separator: "x")
+                .compactMap({ Double($0) }), size.count == 2,
+                let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil })
+            {
+                window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: size[0], height: size[1])), display: true)
+                try? await Task.sleep(for: .seconds(3))
+                capture(to: prefix + "-3.png", model: model)
+            }
+            #endif
         }
     }
 
@@ -30,6 +43,7 @@ enum DebugSnapshot {
         workspaces: \(model.workspaces.count) agents: \(model.agents.count)
         selected: \(model.selectedAgentId ?? "-") firstRows: \(model.timeline.rows.prefix(3).map(\.id)) hasOlder: \(model.timeline.hasOlder) timelineRows: \(model.timeline.rows.count) loaded: \(model.timeline.isLoaded)
         timelineError: \(model.timelineError ?? "-")
+        terminals: \(model.terminals.byWorkspace.mapValues { $0.map(\.id) }) selectedTerminal: \(model.terminals.selectedTerminalId ?? "-")
         """
         #if os(iOS)
         try? summary.write(toFile: path + ".txt", atomically: true, encoding: .utf8)

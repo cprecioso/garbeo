@@ -12,23 +12,29 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Send messages (optimistic, confirmed when the daemon echoes them), stop a running turn, change permission mode, archive
 - Answer permission requests inline (provider-supplied actions or Allow/Deny)
 - Create agents: workspace, provider, model, thinking level, mode, prompt
+- Workspace terminals: listed per workspace in the sidebar (live via `terminals_changed`), opened in a real terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with keyboard input, screen restore on attach, resize, new and kill. On iOS, SwiftTerm's accessory bar provides esc, ctrl, tab, and arrow keys
 - Automatic reconnect with backoff; ping/pong liveness lease
 
 ## Layout
 
 ```
-Package.swift            PaseoKit: protocol models, WebSocket client, timeline reducer (depends on swift-sodium)
+Package.swift            PaseoKit + PaseoTerminal libraries (PaseoKit depends on swift-sodium, PaseoTerminal on SwiftTerm)
 Sources/PaseoKit/
-  DaemonClient.swift     hello handshake, requestId correlation, subscriptions, ping
+  DaemonClient.swift     hello handshake, requestId correlation, subscriptions, ping, binary frames
   DaemonTransport.swift  transport protocol + plain WebSocket transport; endpoint → transport selection
   RelayE2EETransport.swift  relay client channel: e2ee_hello/e2ee_ready, capability negotiation, framing
   RelayCrypto.swift      NaCl box (libsodium) matching packages/relay/src/crypto.ts
   Pairing.swift          pairing offers (#offer=), relay:// connection URIs, relay WebSocket URLs
   Models.swift           tolerant Decodable wire models (unknown fields and enum values are fine)
   Timeline.swift         merges live agent_stream deltas into projected pages; detects seq gaps
+  TerminalFrames.swift   terminal binary frame codec, snapshot → ANSI renderer
+  Terminals.swift        terminal requests, slot-routed output streams
+Sources/PaseoTerminal/   PaseoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
 Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
   Resources/relay-vectors.json  known-answer vectors generated from the upstream TypeScript
-Scripts/generate-relay-vectors.mjs  regenerates those vectors (instructions inside)
+  Fixtures/terminal-vectors.json  terminal codec vectors generated from the upstream TypeScript
+Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
+scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
 App/PaseoSwift.xcodeproj multiplatform SwiftUI app target
 App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner
 ```
@@ -63,6 +69,13 @@ PASEO_LIVE_URL="$URL" PASEO_PASSWORD=pw swift test --filter LiveDaemonTests   # 
 paseo daemon stop --home "$H"
 ```
 
+```sh
+# creates, types into, resizes and kills a terminal; point it at a throwaway daemon
+PASEO_LIVE_URL=127.0.0.1:6899 PASEO_LIVE_TERMINALS=1 swift test --filter LiveTerminal
+```
+
+To get a throwaway daemon: `PASEO_HOME=/tmp/paseo-adhoc PASEO_LISTEN=127.0.0.1:6899 PASEO_RELAY_ENABLED=false paseo daemon run --home /tmp/paseo-adhoc`, then `paseo workspace create --host 127.0.0.1:6899 --isolation local --path <dir>`.
+
 The write tests create agents. When the daemon creates a workspace for them, cleanup archives that workspace only if it didn't exist before the test ran. Otherwise they archive just their own agent. Don't run them against a daemon you're actively using unless that's acceptable.
 
 ## Protocol notes
@@ -73,6 +86,9 @@ Speaks protocol version 1 as defined in `packages/protocol/src/messages.ts` of [
 2. `fetch_workspaces_request` / `fetch_agents_request` with `subscribe: {}` → `workspace_update` / `agent_update`
 3. `session.events.set_subscription.request` for permission events
 4. `agent.timeline.set_subscription.request` + `fetch_agent_timeline_request` (tail) for the open agent; `agent_stream` deltas are merged by `seq`, and a gap or epoch change refetches the tail
+5. Terminals: `list_terminals_request` once, then `subscribe_terminals_request` per workspace for `terminals_changed`. Opening a terminal sends `subscribe_terminal_request` with `restore: visible-snapshot` (when the daemon has `terminal-restore-modes`); the response assigns a slot, and binary frames (`[opcode, slot, payload]`) carry Output/Restore down and Input/Resize up. The slot is bound while the response frame is handled, so the Restore frame right behind it is never dropped. Legacy JSON `Snapshot` frames are rendered to ANSI client-side. The client advertises `terminal_reflowable_snapshot`
+
+PTY size is last-interacting-client-wins: attaching and passive layout never resize. Focusing, clicking or tapping the terminal, returning to its window, or typing after 5s idle sends a `claim`; later grid changes send an `update`, which the daemon ignores if another client has claimed since.
 
 Relay connections (`packages/relay`, `packages/protocol/src/connection-offer.ts`, `daemon-endpoints.ts`):
 
@@ -86,11 +102,14 @@ Relay connections (`packages/relay`, `packages/protocol/src/connection-offer.ts`
 
 - Opening `https://app.paseo.sh/#offer=…` links from other apps (needs associated domains); paste or scan them instead
 - QR scanning on macOS (paste the link instead)
-- Terminals, git diff/commit/PR panes, file explorer, schedules, voice
+- Git diff/commit/PR panes, file explorer, schedules, voice
+- Terminal rename and find
 - Image attachments
 
 ## Debug aids (DEBUG builds)
 
 - `-PaseoSelectAgent first|<agentId>` opens an agent on launch
 - `-PaseoPairingLink <url>` pairs with a relay pairing link and connects on launch
+- `-PaseoSelectTerminal first|<terminalId>|new` opens a terminal on launch (`new` creates one in the first workspace; throwaway daemons only)
+- `-PaseoResizeWindow 900x500` (macOS, with `-PaseoSnapshot`) resizes the window and takes a third snapshot
 - `-PaseoSnapshot /path/prefix` writes a state summary (and on macOS a window PNG) after launch

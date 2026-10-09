@@ -7,8 +7,7 @@ struct SidebarView: View {
     @State private var search = ""
 
     var body: some View {
-        @Bindable var model = model
-        List(selection: $model.selectedAgentId) {
+        List(selection: selection) {
             ConnectionBanner()
 
             ForEach(model.projects) { project in
@@ -16,7 +15,9 @@ struct SidebarView: View {
                 if !workspaces.isEmpty {
                     Section(project.name) {
                         ForEach(workspaces) { workspace in
-                            WorkspaceSection(workspace: workspace, agents: model.agents(in: workspace).filter(matches))
+                            WorkspaceSection(
+                                workspace: workspace, agents: model.agents(in: workspace).filter(matches),
+                                terminals: model.terminals.terminals(in: workspace).filter(matches))
                         }
                     }
                 }
@@ -56,6 +57,21 @@ struct SidebarView: View {
         .refreshable { model.retryNow() }
     }
 
+    /// Rows are tagged with agent ids, or `terminal:<id>` for terminals; one selection drives the detail column.
+    private var selection: Binding<String?> {
+        Binding {
+            model.terminals.selectedTerminalId.map { TerminalRow.tagPrefix + $0 } ?? model.selectedAgentId
+        } set: { value in
+            if let value, value.hasPrefix(TerminalRow.tagPrefix) {
+                model.selectedAgentId = nil
+                model.terminals.selectedTerminalId = String(value.dropFirst(TerminalRow.tagPrefix.count))
+            } else {
+                model.selectedAgentId = value
+                model.terminals.selectedTerminalId = nil
+            }
+        }
+    }
+
     private func matches(_ workspace: Workspace) -> Bool {
         guard !search.isEmpty else { return true }
         return workspace.displayName.localizedCaseInsensitiveContains(search)
@@ -64,6 +80,10 @@ struct SidebarView: View {
 
     private func matches(_ agent: Agent) -> Bool {
         search.isEmpty || agent.displayTitle.localizedCaseInsensitiveContains(search)
+    }
+
+    private func matches(_ terminal: TerminalInfo) -> Bool {
+        search.isEmpty || terminal.displayName.localizedCaseInsensitiveContains(search)
     }
 }
 
@@ -87,16 +107,19 @@ private struct ConnectionBanner: View {
 }
 
 private struct WorkspaceSection: View {
+    @Environment(AppModel.self) private var model
     let workspace: Workspace
     let agents: [Agent]
+    let terminals: [TerminalInfo]
     @State private var isExpanded = true
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
-            if agents.isEmpty {
+            if agents.isEmpty && terminals.isEmpty {
                 Text("No agents").font(.caption).foregroundStyle(.tertiary)
             }
             ForEach(agents) { AgentRow(agent: $0).tag($0.id) }
+            ForEach(terminals) { TerminalRow(terminal: $0).tag(TerminalRow.tagPrefix + $0.id) }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: workspace.workspaceKind == "worktree" ? "arrow.triangle.branch" : "folder")
@@ -106,6 +129,11 @@ private struct WorkspaceSection: View {
                 Spacer(minLength: 4)
                 if let diff = workspace.diffStat, diff.additions + diff.deletions > 0 {
                     DiffStatView(diff: diff)
+                }
+            }
+            .contextMenu {
+                Button("New Terminal", systemImage: "apple.terminal") {
+                    Task { await model.terminals.create(in: workspace) }
                 }
             }
         }
