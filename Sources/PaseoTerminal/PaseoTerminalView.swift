@@ -8,6 +8,7 @@ import SwiftUI
 /// Recreate it (e.g. with `.id`) when the `DaemonClient` changes, such as after a reconnect.
 public struct PaseoTerminalView: View {
     @State private var session: TerminalSession
+    @Environment(\.colorScheme) private var colorScheme
     private let focusOnAppear: Bool
 
     /// - Parameter focusOnAppear: make the terminal first responder when it appears, which also claims the
@@ -23,12 +24,14 @@ public struct PaseoTerminalView: View {
         self.focusOnAppear = focusOnAppear
     }
 
+    private var theme: TerminalTheme { colorScheme == .dark ? .dark : .light }
+
     public var body: some View {
-        SwiftTermHost(session: session, focusOnAppear: focusOnAppear)
+        SwiftTermHost(session: session, theme: theme, focusOnAppear: focusOnAppear)
             // The host view has no intrinsic size; without this, containers that size content by
             // its ideal size (e.g. split panes in an NSHostingController) collapse it to nothing.
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(TerminalTheme.background))
+            .background(Color(theme.background))
             .overlay { statusOverlay }
     }
 
@@ -37,7 +40,7 @@ public struct PaseoTerminalView: View {
         case .idle, .live:
             EmptyView()
         case .attaching:
-            ProgressView().controlSize(.small).tint(.white)
+            ProgressView().controlSize(.small).tint(Color(theme.foreground))
         case .exited(let error):
             TerminalStatusBanner(
                 message: error.map { "Terminal stream ended: \($0)" } ?? "Terminal exited", retry: session.reattach)
@@ -62,17 +65,51 @@ private struct TerminalStatusBanner: View {
     }
 }
 
-@MainActor
-enum TerminalTheme {
-    #if os(macOS)
-    static var background: NSColor { NSColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1) }
-    static var foreground: NSColor { NSColor(white: 0.9, alpha: 1) }
-    static var font: NSFont { .monospacedSystemFont(ofSize: 12, weight: .regular) }
-    #else
-    static var background: UIColor { UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1) }
-    static var foreground: UIColor { UIColor(white: 0.9, alpha: 1) }
-    static var font: UIFont { .monospacedSystemFont(ofSize: 12, weight: .regular) }
-    #endif
+#if os(macOS)
+typealias PlatformColor = NSColor
+typealias PlatformFont = NSFont
+#else
+typealias PlatformColor = UIColor
+typealias PlatformFont = UIFont
+#endif
+
+/// Terminal colors as 0xRRGGBB, ported from the upstream Paseo app's default light and dark themes.
+struct TerminalTheme: Equatable {
+    var backgroundRGB: UInt32
+    var foregroundRGB: UInt32
+    /// Upstream's translucent selection, pre-blended over the background.
+    var selectionRGB: UInt32
+    /// Black, red, green, yellow, blue, magenta, cyan, white, then their bright variants.
+    var ansiRGB: [UInt32]
+
+    static let dark = TerminalTheme(
+        backgroundRGB: 0x181B1A, foregroundRGB: 0xFAFAFA, selectionRGB: 0x464948,
+        ansiRGB: [
+            0x141716, 0xE07070, 0x5DBA80, 0xD4A44A, 0x6A9DE0, 0xB07AD0, 0x4AABB8, 0xD4D4D8,
+            0x434645, 0xE89090, 0x7ECF9A, 0xE0BE6E, 0x8AB4E8, 0xC49AE0, 0x6EC2CC, 0xF0F0F2,
+        ])
+
+    static let light = TerminalTheme(
+        backgroundRGB: 0xFFFFFF, foregroundRGB: 0x1A1A1E, selectionRGB: 0xD9D9D9,
+        ansiRGB: [
+            0x1A1A1E, 0xDC2626, 0x16A34A, 0xCA8A04, 0x2563EB, 0x9333EA, 0x0891B2, 0xFFFFFF,
+            0x3F3F46, 0xEF4444, 0x22C55E, 0xF59E0B, 0x3B82F6, 0xA855F7, 0x06B6D4, 0xFAFAFA,
+        ])
+
+    var background: PlatformColor { Self.native(backgroundRGB) }
+    var foreground: PlatformColor { Self.native(foregroundRGB) }
+    var selection: PlatformColor { Self.native(selectionRGB) }
+    var ansi: [SwiftTerm.Color] {
+        ansiRGB.map { SwiftTerm.Color(red8: UInt16($0 >> 16 & 0xFF), green8: UInt16($0 >> 8 & 0xFF), blue8: UInt16($0 & 0xFF)) }
+    }
+
+    @MainActor static var font: PlatformFont { .monospacedSystemFont(ofSize: 12, weight: .regular) }
+
+    private static func native(_ rgb: UInt32) -> PlatformColor {
+        PlatformColor(
+            red: CGFloat(rgb >> 16 & 0xFF) / 255, green: CGFloat(rgb >> 8 & 0xFF) / 255,
+            blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
+    }
 }
 
 // MARK: - SwiftTerm bridge
@@ -81,18 +118,32 @@ enum TerminalTheme {
 @MainActor
 final class SessionTerminalView: TerminalView, TerminalOutputSink {
     let session: TerminalSession
+    private var theme: TerminalTheme?
 
     init(session: TerminalSession) {
         self.session = session
         super.init(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
         font = TerminalTheme.font
-        nativeBackgroundColor = TerminalTheme.background
-        nativeForegroundColor = TerminalTheme.foreground
         terminalDelegate = self
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func apply(_ theme: TerminalTheme) {
+        guard theme != self.theme else { return }
+        self.theme = theme
+        // Default colors first: SwiftTerm derives the 256-color palette from them.
+        nativeBackgroundColor = theme.background
+        nativeForegroundColor = theme.foreground
+        #if os(iOS)
+        // SwiftTerm paints the iOS background from its layer, resolved once at init.
+        layer.backgroundColor = theme.background.cgColor
+        #endif
+        selectedTextBackgroundColor = theme.selection
+        selectedTextForegroundColor = theme.foreground
+        installColors(theme.ansi)
+    }
 
     func restore(_ data: Data) {
         feed(byteArray: [0x1b, 0x63][...])
@@ -229,10 +280,12 @@ final class TerminalContainerView: NSView {
 
 private struct SwiftTermHost: NSViewRepresentable {
     let session: TerminalSession
+    let theme: TerminalTheme
     let focusOnAppear: Bool
 
     func makeNSView(context: Context) -> TerminalContainerView {
         let terminal = SessionTerminalView(session: session)
+        terminal.apply(theme)
         let container = TerminalContainerView(terminal: terminal)
         container.focusWhenMounted = focusOnAppear
         session.connect(sink: terminal)
@@ -242,7 +295,9 @@ private struct SwiftTermHost: NSViewRepresentable {
         return container
     }
 
-    func updateNSView(_ view: TerminalContainerView, context: Context) {}
+    func updateNSView(_ view: TerminalContainerView, context: Context) {
+        view.terminal.apply(theme)
+    }
 
     static func dismantleNSView(_ view: TerminalContainerView, coordinator: ()) {
         view.terminal.session.disconnect()
@@ -251,10 +306,12 @@ private struct SwiftTermHost: NSViewRepresentable {
 #else
 private struct SwiftTermHost: UIViewRepresentable {
     let session: TerminalSession
+    let theme: TerminalTheme
     let focusOnAppear: Bool
 
     func makeUIView(context: Context) -> SessionTerminalView {
         let terminal = SessionTerminalView(session: session)
+        terminal.apply(theme)
         // SwiftTerm already shows its input accessory bar (esc, ctrl, tab, arrows, …) above the keyboard.
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped))
         tap.cancelsTouchesInView = false
@@ -268,7 +325,9 @@ private struct SwiftTermHost: UIViewRepresentable {
         return terminal
     }
 
-    func updateUIView(_ view: SessionTerminalView, context: Context) {}
+    func updateUIView(_ view: SessionTerminalView, context: Context) {
+        view.apply(theme)
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session) }
 
