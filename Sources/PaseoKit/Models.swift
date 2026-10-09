@@ -306,8 +306,7 @@ public struct ToolCallDetail: Decodable, Sendable, Hashable {
         switch type {
         case "shell": output?.displayString
         case "read", "write": content
-        case "edit": unifiedDiff ?? [oldString.map { "- " + $0 }, newString.map { "+ " + $0 }]
-            .compactMap { $0 }.joined(separator: "\n")
+        case "edit": unifiedDiff ?? lineDiff
         case "search": content
         case "fetch": result
         case "sub_agent": log
@@ -316,6 +315,32 @@ public struct ToolCallDetail: Decodable, Sendable, Hashable {
             [input.map { "Input:\n" + $0.displayString }, output.map { "Output:\n" + $0.displayString }]
                 .compactMap { $0 }.joined(separator: "\n\n")
         }
+    }
+
+    /// Fallback when the daemon sends no `unifiedDiff`: a `+`/`-`/` ` prefixed line diff of the edit.
+    var lineDiff: String? {
+        guard oldString != nil || newString != nil else { return nil }
+        let old = oldString.map { $0.split(separator: "\n", omittingEmptySubsequences: false) } ?? []
+        let new = newString.map { $0.split(separator: "\n", omittingEmptySubsequences: false) } ?? []
+        var removed = Set<Int>(), inserted = Set<Int>()
+        for change in new.difference(from: old) {
+            switch change {
+            case .remove(let offset, _, _): removed.insert(offset)
+            case .insert(let offset, _, _): inserted.insert(offset)
+            }
+        }
+        var lines: [String] = []
+        var i = 0, j = 0
+        while i < old.count || j < new.count {
+            if i < old.count, removed.contains(i) {
+                lines.append("-" + old[i]); i += 1
+            } else if j < new.count, inserted.contains(j) {
+                lines.append("+" + new[j]); j += 1
+            } else {
+                lines.append(" " + old[i]); i += 1; j += 1
+            }
+        }
+        return lines.joined(separator: "\n")
     }
 }
 
