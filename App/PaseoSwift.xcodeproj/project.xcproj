@@ -58,6 +58,9 @@
           "product-name": "PaseoTerminal",
           "build-phase": { "build-phase": "frameworks" },
         }, {
+          "product-name": "PaseoSyntax",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "package": "bonsplit",
           "product-name": "Bonsplit",
           "build-phase": { "build-phase": "frameworks", "platforms": [ "macos" ] },
