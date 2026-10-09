@@ -5,16 +5,12 @@ import Foundation
 // and unknown enum values are preserved as raw strings.
 
 public enum PaseoDate {
-    nonisolated(unsafe) private static let fractional: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-    nonisolated(unsafe) private static let plain = ISO8601DateFormatter()
+    private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let plain = Date.ISO8601FormatStyle()
 
     public static func parse(_ string: String?) -> Date? {
         guard let string else { return nil }
-        return fractional.date(from: string) ?? plain.date(from: string)
+        return (try? fractional.parse(string)) ?? (try? plain.parse(string))
     }
 }
 

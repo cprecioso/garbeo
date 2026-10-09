@@ -33,6 +33,16 @@ private func page(_ entries: String, endSeq: Int, epoch: String = "e1") throws -
     }
 }
 
+@Suite struct PaseoDateTests {
+    @Test func parsesWithAndWithoutFractionalSeconds() {
+        #expect(PaseoDate.parse("2026-10-09T09:31:54.474Z")?.timeIntervalSince1970 == 1_791_538_314.474)
+        #expect(PaseoDate.parse("2026-10-09T09:31:54Z")?.timeIntervalSince1970 == 1_791_538_314)
+        #expect(PaseoDate.parse("2026-10-09T11:31:54+02:00")?.timeIntervalSince1970 == 1_791_538_314)
+        #expect(PaseoDate.parse("2026-10-09") == nil)
+        #expect(PaseoDate.parse(nil) == nil)
+    }
+}
+
 @Suite struct DecodingTests {
     @Test func decodesServerInfo() throws {
         let info = try decodeFrame("""
