@@ -7,13 +7,13 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Connect to a daemon by address (`127.0.0.1:6767`, `host:port`, `ws(s)://…`), with an optional password stored in the Keychain
 - Pair through the Paseo relay: scan the QR code from `paseo daemon pair` / Paseo Desktop (iOS), or paste the pairing link (both platforms). Traffic is end-to-end encrypted (Curve25519 + XSalsa20-Poly1305, wire-compatible with the official apps)
 - Saved hosts list; relay daemon keys and passwords live in the Keychain. The sidebar footer shows whether the connection is direct or relayed
-- Live sidebar: projects → workspaces → agents, with status, diff stats, and permission badges, kept in sync through daemon subscriptions
-- macOS workspaces as tabs (one per agent to start) that drag into nested horizontal/vertical split panes ([Bonsplit](https://bonsplit.alasdairmonk.com/)), each pane with its own live timeline. Layouts persist per workspace across launches
+- Live sidebar: projects → workspaces (iOS: → agents and terminals), with status, diff stats, and permission badges, kept in sync through daemon subscriptions
+- macOS workspaces as tabs (one per agent and terminal) that drag into nested horizontal/vertical split panes ([Bonsplit](https://bonsplit.alasdairmonk.com/)), each pane with its own live timeline. Layouts persist per workspace across launches
 - Agent timeline: markdown replies ([Textual](https://github.com/gonzalezreal/textual): tables, syntax-highlighted code, text selection), collapsible reasoning, tool calls (shell, read, edit diffs, search, fetch, sub-agents), task lists, errors. Streams live, with "load earlier" paging
 - Send messages (optimistic, confirmed when the daemon echoes them), stop a running turn, change permission mode, archive
 - Answer permission requests inline (provider-supplied actions or Allow/Deny)
 - Create agents: workspace, provider, model, thinking level, mode, prompt
-- Workspace terminals: listed per workspace in the sidebar (live via `terminals_changed`), opened in a real terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with keyboard input, screen restore on attach, resize, new and kill. On iOS, SwiftTerm's accessory bar provides esc, ctrl, tab, and arrow keys
+- Workspace terminals: tabs of their workspace on macOS, listed per workspace in the sidebar on iOS (live via `terminals_changed`), opened in a real terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with keyboard input, screen restore on attach, resize, new and kill. On iOS, SwiftTerm's accessory bar provides esc, ctrl, tab, and arrow keys
 - Automatic reconnect with backoff; ping/pong liveness lease
 - Plugin UI: screens, workspace/agent panels, sidebar items and Command Center items from [Paseo plugins](https://paseo.sh/docs/plugins) run unmodified in WKWebView panes (see [Plugins](#plugins))
 
@@ -50,9 +50,9 @@ PluginHost/              source of the JS host runtime (React, react-native-web,
 
 ## Workspace tabs and panes (macOS)
 
-Selecting a workspace in the sidebar opens it as tabs; selecting an agent or terminal focuses (or opens) its tab, and the sidebar follows the focused tab. Tabs show agents (`AgentTab`) and terminals (`TerminalTab`); the toolbar's Open Tab menu lists both and creates terminals. A terminal tab only takes keyboard focus, and with it the PTY size claim, when it was just selected, not when restored. Drag a tab onto a pane's edge to split, onto its center or another tab bar to move it; the tab bar's split buttons create an empty pane. Bonsplit owns the tree; `WorkspaceTabs` maps its tabs to `WorkspaceTabContent` and saves the layout (derived from `treeSnapshot()`) to UserDefaults per daemon and workspace.
+The sidebar lists only workspaces; selecting one opens it as tabs. Every agent and terminal of the workspace gets a tab, including ones created later (appended to the focused pane without taking focus); creating one in the app focuses its tab. Subagents working in their parent's workspace are the exception: they open from the Open Tab menu, and the daemon is told (through an open-tab label) so it keeps them if their parent is archived. As in Paseo's own app, closing a tab archives its agent (confirming first if it's running), only closes the tab of a subagent, or kills its terminal (always confirmed). Tabs show agents (`AgentTab`) and terminals (`TerminalTab`); the toolbar's Open Tab menu lists both and creates terminals. A terminal tab only takes keyboard focus, and with it the PTY size claim, when it was just selected, not when restored. Drag a tab onto a pane's edge to split, onto its center or another tab bar to move it; the tab bar's split buttons create an empty pane. Bonsplit owns the tree; `WorkspaceTabs` maps its tabs to `WorkspaceTabContent` and saves the layout (derived from `treeSnapshot()`) to UserDefaults per daemon and workspace.
 
-To add a tab kind (plugin webview, …), write a struct conforming to `WorkspaceTabKind` (a label and a content view) and add one `case` plus its `kind` arm to `WorkspaceTabContent` in `Workspace/WorkspaceTabContent.swift`. Tab bar, splits, drag and drop and persistence need nothing else.
+To add a tab kind (plugin webview, …), write a struct conforming to `WorkspaceTabKind` (a label, a content view, and optionally what closing it does) and add one `case` plus its `kind` arm to `WorkspaceTabContent` in `Workspace/WorkspaceTabContent.swift`. Tab bar, splits, drag and drop and persistence need nothing else.
 
 ## Build and run
 

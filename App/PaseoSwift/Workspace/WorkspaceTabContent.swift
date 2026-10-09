@@ -7,7 +7,8 @@ import SwiftUI
 /// by stable IDs only, never by runtime objects.
 ///
 /// Adding a kind (terminal, plugin webview, …):
-/// 1. write a struct conforming to `WorkspaceTabKind` (label + content view),
+/// 1. write a struct conforming to `WorkspaceTabKind` (label + content view, optionally what
+///    closing the tab does),
 /// 2. add a `case` here and its arm in `kind`.
 /// The tab bar, splits, drag and drop, and persistence need no other changes.
 enum WorkspaceTabContent: Hashable, Codable, Sendable {
@@ -23,11 +24,7 @@ enum WorkspaceTabContent: Hashable, Codable, Sendable {
         }
     }
 
-    var agentId: String? {
-        if case .agent(let tab) = self { tab.agentId } else { nil }
-    }
-
-    /// The sidebar row for this tab, if it has one; the sidebar follows the focused tab.
+    /// The app selection while this tab is focused; the sidebar highlights its workspace.
     var sidebarSelection: SidebarSelection? {
         switch self {
         case .agent(let tab): .agent(tab.agentId)
@@ -46,12 +43,30 @@ protocol WorkspaceTabKind: Hashable, Codable, Sendable {
     @MainActor func label(in model: AppModel) -> WorkspaceTabLabel?
 
     @MainActor @ViewBuilder func makeContent(in model: AppModel) -> Content
+
+    /// Asked for before the user closes the tab; nil closes it right away. Default: nil.
+    @MainActor func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation?
+
+    /// Closes the tab by calling `closeTab`, and does what that means for its target (archive the
+    /// agent, kill the terminal). Default: just closes the tab.
+    @MainActor func close(in model: AppModel, closeTab: () -> Void) async
 }
 
 extension WorkspaceTabKind {
     @MainActor func anyContent(in model: AppModel) -> AnyView {
         AnyView(makeContent(in: model))
     }
+
+    @MainActor func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation? { nil }
+
+    @MainActor func close(in model: AppModel, closeTab: () -> Void) async { closeTab() }
+}
+
+struct WorkspaceTabCloseConfirmation: Equatable {
+    var title: String
+    var message: String
+    /// The destructive button's title.
+    var action: String
 }
 
 struct WorkspaceTabLabel: Equatable {
@@ -87,6 +102,30 @@ struct AgentTab: WorkspaceTabKind {
             ContentUnavailableView("Agent unavailable", systemImage: "questionmark.bubble")
         }
     }
+
+    func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation? {
+        guard let agent = model.agents[agentId], agent.parentAgentId == nil, agent.status == .running else { return nil }
+        return WorkspaceTabCloseConfirmation(
+            title: "Archive running agent?",
+            message: "This agent is still running. Archiving it will stop the agent and close the tab.",
+            action: "Archive")
+    }
+
+    /// Closing a subagent's tab only closes the tab, once the daemon knows this client no longer
+    /// shows it. Closing any other agent's tab archives the agent.
+    func close(in model: AppModel, closeTab: () -> Void) async {
+        guard model.agents[agentId]?.parentAgentId != nil else {
+            closeTab()
+            await model.archive(agentId)
+            return
+        }
+        do {
+            try await model.setOpenTab(false, for: agentId)
+            closeTab()
+        } catch {
+            model.lastError = error.localizedDescription
+        }
+    }
 }
 
 // MARK: - Terminal
@@ -114,6 +153,19 @@ struct TerminalTab: WorkspaceTabKind {
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation? {
+        WorkspaceTabCloseConfirmation(
+            title: "Close terminal?",
+            message: "Any running process in this terminal will be stopped immediately.",
+            action: "Close")
+    }
+
+    func close(in model: AppModel, closeTab: () -> Void) async {
+        closeTab()
+        guard let terminal = model.terminals.byWorkspace[workspaceId]?.first(where: { $0.id == terminalId }) else { return }
+        await model.terminals.kill(terminal)
     }
 
     /// Focusing claims the PTY size, so only the terminal the user just selected takes focus.
