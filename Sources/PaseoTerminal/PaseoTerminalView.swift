@@ -103,6 +103,19 @@ final class SessionTerminalView: TerminalView, TerminalOutputSink {
         feed(byteArray: ArraySlice(data))
     }
 
+    #if DEBUG
+    /// Development aid: `-PaseoTerminalType 'echo hi\r'` types through the emulator's input path
+    /// shortly after the terminal goes live (and after its restore).
+    func typeDebugInputIfRequested() {
+        guard let text = UserDefaults.standard.string(forKey: "PaseoTerminalType") else { return }
+        Task { [weak self] in
+            while let self, self.session.phase != .live { try? await Task.sleep(for: .milliseconds(20)) }
+            try? await Task.sleep(for: .milliseconds(300))
+            self?.send(txt: text.replacingOccurrences(of: "\\r", with: "\r"))
+        }
+    }
+    #endif
+
     #if os(iOS)
     /// Become first responder once in a window (SwiftUI creates the view before mounting it).
     var focusWhenMounted = false
@@ -122,8 +135,7 @@ final class SessionTerminalView: TerminalView, TerminalOutputSink {
     #endif
 }
 
-// SwiftTerm calls its delegate on the main thread but predates Swift concurrency annotations.
-extension SessionTerminalView: @preconcurrency TerminalViewDelegate {
+extension SessionTerminalView: TerminalViewDelegate {
     func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
         session.gridDidChange(cols: newCols, rows: newRows)
     }
@@ -224,6 +236,9 @@ private struct SwiftTermHost: NSViewRepresentable {
         let container = TerminalContainerView(terminal: terminal)
         container.focusWhenMounted = focusOnAppear
         session.connect(sink: terminal)
+        #if DEBUG
+        terminal.typeDebugInputIfRequested()
+        #endif
         return container
     }
 
@@ -247,6 +262,9 @@ private struct SwiftTermHost: UIViewRepresentable {
         terminal.addGestureRecognizer(tap)
         terminal.focusWhenMounted = focusOnAppear
         session.connect(sink: terminal)
+        #if DEBUG
+        terminal.typeDebugInputIfRequested()
+        #endif
         return terminal
     }
 
