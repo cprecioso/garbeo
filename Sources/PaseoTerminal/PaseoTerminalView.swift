@@ -25,6 +25,9 @@ public struct PaseoTerminalView: View {
 
     public var body: some View {
         SwiftTermHost(session: session, focusOnAppear: focusOnAppear)
+            // The host view has no intrinsic size; without this, containers that size content by
+            // its ideal size (e.g. split panes in an NSHostingController) collapse it to nothing.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(TerminalTheme.background))
             .overlay { statusOverlay }
     }

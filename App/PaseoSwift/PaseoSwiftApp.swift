@@ -72,6 +72,9 @@ struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var showingNewAgent = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    #if os(macOS)
+    @State private var workspaceTabs = WorkspaceTabsRegistry()
+    #endif
 
     var body: some View {
         @Bindable var model = model
@@ -79,6 +82,22 @@ struct MainView: View {
             SidebarView(showingNewAgent: $showingNewAgent)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
+            #if os(macOS)
+            if let workspace = model.selectedWorkspace {
+                WorkspaceView(
+                    workspace: workspace, tabs: workspaceTabs.tabs(for: workspace, model: model),
+                    showingNewAgent: $showingNewAgent)
+                    .id(workspace.id)
+            } else if let terminal = model.terminals.selectedTerminal {
+                TerminalDetailView(terminal: terminal)
+                    .id(terminal.id)
+            } else if let agent = model.selectedAgent {
+                AgentDetailView(agent: agent)
+                    .id(agent.id)
+            } else {
+                EmptyDetailView(showingNewAgent: $showingNewAgent)
+            }
+            #else
             if let terminal = model.terminals.selectedTerminal {
                 TerminalDetailView(terminal: terminal)
                     .id(terminal.id)
@@ -88,6 +107,7 @@ struct MainView: View {
             } else {
                 EmptyDetailView(showingNewAgent: $showingNewAgent)
             }
+            #endif
         }
         .sheet(isPresented: $showingNewAgent) {
             NewAgentView()

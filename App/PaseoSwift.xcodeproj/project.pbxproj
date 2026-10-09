@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		AB12CD34EF56000000000001 /* PaseoKit in Frameworks */ = {isa = PBXBuildFile; productRef = AB12CD34EF56000000000006 /* PaseoKit */; };
 		AB12CD34EF56000000000101 /* PaseoTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = AB12CD34EF56000000000106 /* PaseoTerminal */; };
+		AB12CD34EF56000000000014 /* Bonsplit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = AB12CD34EF56000000000015 /* Bonsplit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 			files = (
 				AB12CD34EF56000000000001 /* PaseoKit in Frameworks */,
 				AB12CD34EF56000000000101 /* PaseoTerminal in Frameworks */,
+				AB12CD34EF56000000000014 /* Bonsplit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -76,6 +78,7 @@
 			packageProductDependencies = (
 				AB12CD34EF56000000000006 /* PaseoKit */,
 				AB12CD34EF56000000000106 /* PaseoTerminal */,
+				AB12CD34EF56000000000015 /* Bonsplit */,
 			);
 			productName = PaseoSwift;
 			productReference = AB12CD34EF56000000000007 /* PaseoSwift.app */;
@@ -107,6 +110,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AB12CD34EF5600000000000B /* XCLocalSwiftPackageReference ".." */,
+				AB12CD34EF56000000000016 /* XCRemoteSwiftPackageReference "bonsplit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AB12CD34EF5600000000000A /* Products */;
@@ -267,6 +271,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		AB12CD34EF56000000000016 /* XCRemoteSwiftPackageReference "bonsplit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/almonk/bonsplit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		AB12CD34EF56000000000006 /* PaseoKit */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -275,6 +290,11 @@
 		AB12CD34EF56000000000106 /* PaseoTerminal */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PaseoTerminal;
+		};
+		AB12CD34EF56000000000015 /* Bonsplit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AB12CD34EF56000000000016 /* XCRemoteSwiftPackageReference "bonsplit" */;
+			productName = Bonsplit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
