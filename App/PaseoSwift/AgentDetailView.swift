@@ -31,6 +31,7 @@ struct AgentDetailView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 #endif
                 .toolbar { AgentToolbar(agent: agent) }
+                .toolbar { PluginAgentToolbar(agent: agent) }
         case .pane:
             VStack(spacing: 0) {
                 AgentPaneHeader(agent: agent, subtitle: subtitle)

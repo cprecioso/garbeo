@@ -10,6 +10,7 @@ struct SidebarView: View {
         @Bindable var model = model
         List(selection: $model.selection) {
             ConnectionBanner()
+            PluginSidebarSection()
 
             ForEach(model.projects) { project in
                 let workspaces = project.workspaces.filter { matches($0) }
@@ -121,6 +122,7 @@ private struct WorkspaceSection: View {
                 Button("New Terminal", systemImage: "apple.terminal") {
                     Task { await model.terminals.create(in: workspace) }
                 }
+                PluginWorkspaceMenuItems(workspaceId: workspace.id)
             }
         }
         #if os(macOS)

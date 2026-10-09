@@ -46,6 +46,7 @@ struct WorkspaceView: View {
                             Task { await model.terminals.create(in: workspace) }
                         }
                     }
+                    PluginWorkspaceMenuItems(workspaceId: workspace.id)
                 } label: {
                     Label("Open Tab", systemImage: "plus.rectangle.on.rectangle")
                 }
@@ -75,6 +76,12 @@ struct WorkspaceView: View {
                 break
             }
         }
+        .onChange(of: model.plugins.tabRequest, initial: true) { _, request in
+            // Plugin panels for this workspace (from menus, commands or plugin code) open as tabs.
+            guard let request, case .panel(_, let workspaceId, _) = request.kind, workspaceId == workspace.id else { return }
+            model.plugins.tabRequest = nil
+            tabs.open(.plugin(PluginTab(target: request)))
+        }
         .onChange(of: tabs.focusedContent) { _, content in
             // ...and the sidebar follows the focused tab.
             guard tabs.isReady else { return }
@@ -96,6 +103,7 @@ extension WorkspaceTabContent {
         switch self {
         case .agent(let tab): "agent:\(tab.agentId)"
         case .terminal(let tab): "terminal:\(tab.terminalId)"
+        case .plugin(let tab): "plugin:\(tab.target.id)"
         }
     }
 }
