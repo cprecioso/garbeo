@@ -110,6 +110,17 @@ private func page(_ entries: String, endSeq: Int, epoch: String = "e1") throws -
         #expect(call.detail.exitCode == 0)
     }
 
+    @Test func editWithoutUnifiedDiffFallsBackToLineDiff() throws {
+        func detail(_ json: String) throws -> ToolCallDetail {
+            try JSONDecoder().decode(ToolCallDetail.self, from: Data(json.utf8))
+        }
+        let edit = try detail(#"{"type":"edit","oldString":"a\nb\nc\nd","newString":"a\nB\nc\nd\ne"}"#)
+        #expect(edit.body == " a\n-b\n+B\n c\n d\n+e")
+        #expect(try detail(#"{"type":"edit","newString":"x\ny"}"#).body == "+x\n+y")
+        #expect(try detail(#"{"type":"edit","oldString":"x\ny","newString":"z","unifiedDiff":"@@ raw"}"#).body == "@@ raw")
+        #expect(try detail(#"{"type":"edit"}"#).body == nil)
+    }
+
     @Test func decodesPermissionRequest() throws {
         let payload = try decodeFrame("""
         {"type":"session","message":{"type":"agent_permission_request","payload":{"agentId":"a1",
