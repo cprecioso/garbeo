@@ -47,7 +47,7 @@ final class PluginWebRuntime: NSObject {
     private weak var host: PluginRuntimeHost?
     private var ready = false
     private var queued: [JSONValue] = []
-    private var sockets: [String: URLSessionWebSocketTask] = [:]
+    private var sockets: [String: any DaemonTransport] = [:]
     private let session = URLSession(configuration: .default)
     private(set) var rendered = false
 
@@ -85,7 +85,7 @@ final class PluginWebRuntime: NSObject {
 
     /// Stops sockets and the page. The runtime is unusable afterwards.
     func shutdown() {
-        for task in sockets.values { task.cancel(with: .goingAway, reason: nil) }
+        for transport in sockets.values { transport.close() }
         sockets.removeAll()
         webView.configuration.userContentController.removeAllScriptMessageHandlers()
         webView.stopLoading()
@@ -155,17 +155,17 @@ final class PluginWebRuntime: NSObject {
             return openSocket(socketId)
         case "socket.send":
             guard let socketId = message["socketId"]?.stringValue, let data = message["data"]?.stringValue,
-                  let task = sockets[socketId]
+                  let transport = sockets[socketId]
             else { return (nil, "Socket is closed") }
             do {
-                try await task.send(.string(data))
+                try await transport.send(.text(data))
                 return (nil, nil)
             } catch {
                 return (nil, error.localizedDescription)
             }
         case "socket.close":
             if let socketId = message["socketId"]?.stringValue {
-                sockets.removeValue(forKey: socketId)?.cancel(with: .normalClosure, reason: nil)
+                sockets.removeValue(forKey: socketId)?.close()
             }
             return (nil, nil)
         case "openExternal":
@@ -191,22 +191,27 @@ final class PluginWebRuntime: NSObject {
 
     // MARK: Socket relay
 
+    /// Uses the same transport as the app's own connection, so relay (E2EE) hosts work too.
     private func openSocket(_ socketId: String) -> (Any?, String?) {
-        guard let endpoint = host?.pluginEndpoint, let url = try? endpoint.webSocketURL() else {
+        guard let endpoint = host?.pluginEndpoint, let transport = try? endpoint.makeTransport(session: session) else {
             return (nil, PaseoError.disconnected.localizedDescription)
         }
-        let task = session.webSocketTask(with: url)
-        task.maximumMessageSize = 64 * 1024 * 1024
-        sockets[socketId] = task
-        task.resume()
-        // URLSession queues sends until the handshake completes, so the page may start now.
-        sendSocketEvent(socketId, "open")
+        sockets[socketId] = transport
         Task { [weak self] in
+            do {
+                try await transport.open()
+                // The page sends its `hello` on open, so only report it once frames can flow.
+                self?.sendSocketEvent(socketId, "open")
+            } catch {
+                guard let self, self.sockets.removeValue(forKey: socketId) != nil else { return }
+                self.sendSocketEvent(socketId, "close", reason: error.localizedDescription)
+                return
+            }
             while true {
                 do {
-                    let frame = try await task.receive()
+                    let frame = try await transport.receive()
                     guard let self else { return }
-                    if case .string(let text) = frame { self.sendSocketEvent(socketId, "message", data: text) }
+                    if case .text(let text) = frame { self.sendSocketEvent(socketId, "message", data: text) }
                 } catch {
                     guard let self, self.sockets.removeValue(forKey: socketId) != nil else { return }
                     self.sendSocketEvent(socketId, "close", reason: error.localizedDescription)
@@ -257,7 +262,7 @@ extension PluginWebRuntime: WKNavigationDelegate, WKUIDelegate {
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         log.error("plugin web content process terminated; reloading")
         ready = false
-        for task in sockets.values { task.cancel(with: .goingAway, reason: nil) }
+        for transport in sockets.values { transport.close() }
         sockets.removeAll()
         webView.reload()
     }

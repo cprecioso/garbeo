@@ -12,6 +12,13 @@ struct PaseoSwiftApp: App {
                 .task {
                     #if DEBUG
                     DebugSnapshot.scheduleIfRequested(model: model)
+                    // Development aid: `-PaseoPairingLink <url>` pairs and connects on launch.
+                    if let link = UserDefaults.standard.string(forKey: "PaseoPairingLink"),
+                       let endpoint = try? DaemonEndpoint.fromPairingLink(link)
+                    {
+                        await model.connect(to: endpoint)
+                        return
+                    }
                     #endif
                     if let endpoint = model.endpoint, model.connection == .idle {
                         await model.connect(to: endpoint)
@@ -42,11 +49,14 @@ struct RootView: View {
             case .idle, .failed:
                 ConnectView()
             case .connecting:
-                ProgressView("Connecting to \(model.endpoint?.url ?? "daemon")…")
+                ProgressView("Connecting to \(model.endpoint?.displayAddress ?? "daemon")…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .connected, .reconnecting:
                 MainView()
             }
+        }
+        .onChange(of: model.serverInfo?.hostname) { _, hostname in
+            HostStore.shared.updateCurrentName(hostname)
         }
         .alert("Something went wrong", isPresented: Binding(
             get: { model.lastError != nil }, set: { if !$0 { model.lastError = nil } }
@@ -62,7 +72,9 @@ struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var showingNewAgent = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
-    #if os(iOS)
+    #if os(macOS)
+    @State private var workspaceTabs = WorkspaceTabsRegistry()
+    #else
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
 
@@ -72,35 +84,54 @@ struct MainView: View {
             SidebarView(showingNewAgent: $showingNewAgent)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
-            if let pane = model.plugins.activePane, !isCompact {
+            #if os(macOS)
+            if let pane = model.plugins.activePane {
                 PluginPaneDetail(target: pane)
+            } else if let workspace = model.selectedWorkspace {
+                WorkspaceView(
+                    workspace: workspace, tabs: workspaceTabs.tabs(for: workspace, model: model),
+                    showingNewAgent: $showingNewAgent)
+                    .id(workspace.id)
+            } else if let terminal = model.terminals.selectedTerminal {
+                TerminalDetailView(terminal: terminal)
+                    .id(terminal.id)
             } else if let agent = model.selectedAgent {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
                 EmptyDetailView(showingNewAgent: $showingNewAgent)
             }
+            #else
+            if let pane = model.plugins.activePane, sizeClass != .compact {
+                PluginPaneDetail(target: pane)
+            } else if let terminal = model.terminals.selectedTerminal {
+                TerminalDetailView(terminal: terminal)
+                    .id(terminal.id)
+            } else if let agent = model.selectedAgent {
+                AgentDetailView(agent: agent)
+                    .id(agent.id)
+            } else {
+                EmptyDetailView(showingNewAgent: $showingNewAgent)
+            }
+            #endif
         }
         .sheet(isPresented: $showingNewAgent) {
             NewAgentView()
         }
+        #if os(iOS)
         // Compact iPhone layouts show the sidebar alone, so plugin panes open as a sheet there.
-        .sheet(item: Binding(get: { isCompact ? model.plugins.activePane : nil }, set: { model.plugins.activePane = $0 })) { pane in
+        .sheet(item: Binding(
+            get: { sizeClass == .compact ? model.plugins.activePane : nil },
+            set: { model.plugins.activePane = $0 }
+        )) { pane in
             NavigationStack { PluginPaneDetail(target: pane) }
                 .environment(model)
         }
-        .onChange(of: model.selectedAgentId) { _, agentId in
-            if agentId != nil { model.plugins.activePane = nil }
+        #endif
+        .onChange(of: model.selection) { _, selection in
+            if selection != nil { model.plugins.activePane = nil }
         }
         .background(PluginRegistryHost())
-    }
-
-    private var isCompact: Bool {
-        #if os(iOS)
-        sizeClass == .compact
-        #else
-        false
-        #endif
     }
 }
 

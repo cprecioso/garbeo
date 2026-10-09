@@ -8,7 +8,7 @@ struct SidebarView: View {
 
     var body: some View {
         @Bindable var model = model
-        List(selection: $model.selectedAgentId) {
+        List(selection: $model.selection) {
             ConnectionBanner()
             PluginSidebarSection()
 
@@ -17,7 +17,9 @@ struct SidebarView: View {
                 if !workspaces.isEmpty {
                     Section(project.name) {
                         ForEach(workspaces) { workspace in
-                            WorkspaceSection(workspace: workspace, agents: model.agents(in: workspace).filter(matches))
+                            WorkspaceSection(
+                                workspace: workspace, agents: model.agents(in: workspace).filter(matches),
+                                terminals: model.terminals.terminals(in: workspace).filter(matches))
                         }
                     }
                 }
@@ -26,11 +28,12 @@ struct SidebarView: View {
             let unplaced = model.unplacedAgents.filter(matches)
             if !unplaced.isEmpty {
                 Section("Other agents") {
-                    ForEach(unplaced) { AgentRow(agent: $0).tag($0.id) }
+                    ForEach(unplaced) { AgentRow(agent: $0).tag(SidebarSelection.agent($0.id)) }
                 }
             }
         }
         .searchable(text: $search, placement: .sidebar, prompt: "Filter agents")
+        .safeAreaInset(edge: .bottom, spacing: 0) { ConnectionFooter() }
         .navigationTitle(model.serverInfo?.hostname ?? "Paseo")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -65,6 +68,10 @@ struct SidebarView: View {
     private func matches(_ agent: Agent) -> Bool {
         search.isEmpty || agent.displayTitle.localizedCaseInsensitiveContains(search)
     }
+
+    private func matches(_ terminal: TerminalInfo) -> Bool {
+        search.isEmpty || terminal.displayName.localizedCaseInsensitiveContains(search)
+    }
 }
 
 private struct ConnectionBanner: View {
@@ -87,16 +94,19 @@ private struct ConnectionBanner: View {
 }
 
 private struct WorkspaceSection: View {
+    @Environment(AppModel.self) private var model
     let workspace: Workspace
     let agents: [Agent]
+    let terminals: [TerminalInfo]
     @State private var isExpanded = true
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
-            if agents.isEmpty {
+            if agents.isEmpty && terminals.isEmpty {
                 Text("No agents").font(.caption).foregroundStyle(.tertiary)
             }
-            ForEach(agents) { AgentRow(agent: $0).tag($0.id) }
+            ForEach(agents) { AgentRow(agent: $0).tag(SidebarSelection.agent($0.id)) }
+            ForEach(terminals) { TerminalRow(terminal: $0).tag(SidebarSelection.terminal($0.id)) }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: workspace.workspaceKind == "worktree" ? "arrow.triangle.branch" : "folder")
@@ -108,8 +118,17 @@ private struct WorkspaceSection: View {
                     DiffStatView(diff: diff)
                 }
             }
-            .contextMenu { PluginWorkspaceMenuItems(workspaceId: workspace.id) }
+            .contextMenu {
+                Button("New Terminal", systemImage: "apple.terminal") {
+                    Task { await model.terminals.create(in: workspace) }
+                }
+                PluginWorkspaceMenuItems(workspaceId: workspace.id)
+            }
         }
+        #if os(macOS)
+        // On macOS a workspace opens as tabs and split panes.
+        .tag(SidebarSelection.workspace(workspace.id))
+        #endif
     }
 }
 

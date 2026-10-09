@@ -12,26 +12,38 @@ enum ConnectionState: Equatable {
     var isConnected: Bool { if case .connected = self { true } else { false } }
 }
 
+/// What the sidebar has selected. iOS selects agents and terminals; macOS can also select a
+/// workspace, which opens its tabbed workspace view (selecting an agent or terminal there focuses
+/// its tab).
+enum SidebarSelection: Hashable {
+    case agent(String)
+    case workspace(String)
+    case terminal(String)
+}
+
 struct ProjectGroup: Identifiable {
     var id: String
     var name: String
     var workspaces: [Workspace]
 }
 
-/// Owns the daemon connection and the replicated directory (workspaces, agents) plus the
-/// timeline of the agent being viewed.
+/// Owns the daemon connection and the replicated directory (workspaces, agents) plus live
+/// timelines for every agent on screen.
 @MainActor @Observable
 final class AppModel {
     private(set) var connection: ConnectionState = .idle
     private(set) var workspaces: [String: Workspace] = [:]
     private(set) var agents: [String: Agent] = [:]
     private(set) var permissions: [String: [PermissionRequest]] = [:]
-    private(set) var timeline = AgentTimeline()
-    private(set) var timelineError: String?
-    private(set) var isLoadingOlder = false
-    var selectedAgentId: String? {
-        didSet { if oldValue != selectedAgentId { Task { await viewAgent(selectedAgentId) } } }
+    /// Live timelines of the agents currently shown, see `showTimeline(_:viewer:)`.
+    private(set) var timelines = TimelineRegistry()
+    /// The single selection driving the detail column. Terminal selection made by
+    /// `TerminalDirectory` (new terminal, terminal gone) goes through `terminals.selectedTerminalId`,
+    /// which reads and writes this.
+    var selection: SidebarSelection? {
+        didSet { if let workspace = selectedWorkspace { lastWorkspaceId = workspace.id } }
     }
+    let terminals = TerminalDirectory()
     var lastError: String?
     let plugins = PluginStore()
 
@@ -39,11 +51,14 @@ final class AppModel {
         didSet { Self.saveEndpoint(endpoint) }
     }
 
-    private var client: DaemonClient?
+    private(set) var client: DaemonClient?
     private var eventTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
     private var generation = 0
     private let clientId: String
+    /// The workspace the most recent selection belonged to; macOS keeps it open on deselect.
+    @ObservationIgnored private var lastWorkspaceId: String?
+    @ObservationIgnored private var subscriptionSync: TimelineSubscriptionSync!
 
     init() {
         let defaults = UserDefaults.standard
@@ -55,6 +70,26 @@ final class AppModel {
         }
         endpoint = Self.loadEndpoint()
         plugins.app = self
+        terminals.onError = { [weak self] in self?.lastError = $0 }
+        terminals.selection = (
+            get: { [weak self] in if case .terminal(let id) = self?.selection { id } else { nil } },
+            set: { [weak self] id in
+                guard let self else { return }
+                if let id {
+                    selection = .terminal(id)
+                } else if case .terminal = selection {
+                    clearSelection()
+                }
+            })
+        subscriptionSync = TimelineSubscriptionSync(
+            send: { [weak self] agentIds in
+                guard let client = self?.client else { throw PaseoError.disconnected }
+                try await client.setTimelineSubscription(agentIds: agentIds)
+            },
+            acknowledged: { [weak self] agentIds in
+                self?.timelines.subscriptionAcknowledged(agentIds)
+                self?.fetchTails()
+            })
     }
 
     // MARK: Derived state
@@ -63,7 +98,26 @@ final class AppModel {
         if case .connected(let info) = connection { info } else { nil }
     }
 
+    var selectedAgentId: String? {
+        if case .agent(let id) = selection { id } else { nil }
+    }
+
     var selectedAgent: Agent? { selectedAgentId.flatMap { agents[$0] } }
+
+    /// The workspace the selection belongs to: the selected workspace, or the selected agent's.
+    var selectedWorkspace: Workspace? {
+        switch selection {
+        case .workspace(let id): workspaces[id]
+        case .agent(let id): agents[id].flatMap(workspace(for:))
+        case .terminal: terminals.selectedTerminal.flatMap(terminals.workspaceId(of:)).flatMap { workspaces[$0] }
+        case nil: nil
+        }
+    }
+
+    func workspace(for agent: Agent) -> Workspace? {
+        if let id = agent.workspaceId { return workspaces[id] }
+        return workspaces.values.first { $0.workspaceDirectory == agent.cwd }
+    }
 
     var projects: [ProjectGroup] {
         let grouped = Dictionary(grouping: workspaces.values, by: \.projectId)
@@ -120,8 +174,11 @@ final class AppModel {
         workspaces = [:]
         agents = [:]
         permissions = [:]
-        timeline = AgentTimeline()
-        selectedAgentId = nil
+        timelines = TimelineRegistry()
+        subscriptionSync.desired = []
+        subscriptionSync.reset()
+        selection = nil
+        terminals.reset()
     }
 
     func forgetEndpoint() {
@@ -180,16 +237,36 @@ final class AppModel {
         try await client.subscribeToSessionEvents([
             "agent_permission_request", "agent_permission_resolved", "agent_attention_required",
         ] + pluginEvents)
-        if let selectedAgentId, agents[selectedAgentId] != nil {
-            await viewAgent(selectedAgentId)
-        } else if selectedAgentId != nil {
-            selectedAgentId = nil
+        // Terminal lists aren't needed to show the sidebar; don't hold up the connection for them.
+        Task {
+            await terminals.connect(client, workspaces: Array(workspaces.values))
+            #if DEBUG
+            // Development aid: `-PaseoSelectTerminal first|new|<terminalId>` opens a terminal on launch.
+            if let requested = UserDefaults.standard.string(forKey: "PaseoSelectTerminal") {
+                await terminals.applyDebugSelection(requested, workspaces: projects.flatMap(\.workspaces))
+            }
+            #endif
         }
+        switch selection {
+        case .agent(let id) where agents[id] == nil: selection = nil
+        case .workspace(let id) where workspaces[id] == nil: selection = nil
+        default: break
+        }
+        // The new socket has no timeline subscriptions; resubscribe and refetch what's on screen.
+        timelines.connectionReset()
+        subscriptionSync.reset()
+        subscriptionSync.desired = timelines.visibleAgentIds
+        await subscriptionSync.flush()
         #if DEBUG
-        // Development aid: `-PaseoSelectAgent first|<agentId>` opens an agent on launch.
-        if selectedAgentId == nil, let requested = UserDefaults.standard.string(forKey: "PaseoSelectAgent") {
-            selectedAgentId = requested == "first"
-                ? projects.flatMap(\.workspaces).flatMap(agents(in:)).first?.id : requested
+        // Development aids: `-PaseoSelectAgent first|<agentId>` opens an agent on launch,
+        // `-PaseoSelectWorkspace first|<workspaceId>` a workspace.
+        if selection == nil, let requested = UserDefaults.standard.string(forKey: "PaseoSelectAgent") {
+            selection = (requested == "first"
+                ? projects.flatMap(\.workspaces).flatMap(agents(in:)).first?.id : requested).map(SidebarSelection.agent)
+        }
+        if selection == nil, let requested = UserDefaults.standard.string(forKey: "PaseoSelectWorkspace") {
+            selection = (requested == "first"
+                ? projects.flatMap(\.workspaces).first { !agents(in: $0).isEmpty }?.id : requested).map(SidebarSelection.workspace)
         }
         #endif
     }
@@ -220,11 +297,16 @@ final class AppModel {
         case .agentUpdate(.remove(let agentId)):
             agents[agentId] = nil
             permissions[agentId] = nil
-            if selectedAgentId == agentId { selectedAgentId = nil }
+            timelines.removeAgent(agentId)
+            if selectedAgentId == agentId { clearSelection() }
         case .workspaceUpdate(.upsert(let workspace)):
             workspaces[workspace.id] = workspace
+            Task { await terminals.observe(workspace) }
         case .workspaceUpdate(.remove(let id)):
             workspaces[id] = nil
+            terminals.forget(workspaceId: id)
+        case .terminalsChanged(let change):
+            terminals.apply(change)
         case .agentStream(let payload):
             handleStream(payload)
         case .permissionRequested(let payload):
@@ -248,7 +330,6 @@ final class AppModel {
     }
 
     private func handleStream(_ payload: AgentStreamPayload) {
-        guard payload.agentId == selectedAgentId else { return }
         switch payload.event {
         case .permissionRequested(let request):
             var list = permissions[payload.agentId] ?? []
@@ -259,51 +340,64 @@ final class AppModel {
         default:
             break
         }
-        if timeline.apply(payload) == .gap {
-            Task { await reloadTimeline() }
-        }
+        if timelines.apply(payload) { fetchTails() }
     }
 
-    // MARK: Viewed agent
+    // MARK: Visible timelines
 
-    private func viewAgent(_ agentId: String?) async {
-        timeline = AgentTimeline()
-        timelineError = nil
+    /// Registers that `viewer` (one mounted agent view) shows `agentId`. The union over all viewers
+    /// is the daemon timeline subscription; each shown agent gets its own live timeline.
+    func showTimeline(_ agentId: String, viewer: UUID) {
+        timelines.show(agentId, viewer: viewer)
+        syncTimelineSubscription()
+    }
+
+    func hideTimeline(viewer: UUID) {
+        timelines.hide(viewer: viewer)
+        syncTimelineSubscription()
+    }
+
+    /// The error to show instead of a timeline that hasn't loaded.
+    func timelineError(for agentId: String) -> String? {
+        timelines[agentId]?.error ?? (timelines.subscribed.contains(agentId) ? nil : subscriptionSync.lastError)
+    }
+
+    private func syncTimelineSubscription() {
+        fetchTails()
+        let visible = timelines.visibleAgentIds
+        guard subscriptionSync.desired != visible else { return }
+        subscriptionSync.desired = visible
+        Task { await subscriptionSync.flush() }
+    }
+
+    private func fetchTails() {
         guard let client else { return }
-        do {
-            try await client.setTimelineSubscription(agentIds: agentId.map { [$0] } ?? [])
-            guard agentId != nil else { return }
-            await reloadTimeline()
-        } catch {
-            timelineError = error.localizedDescription
+        for (agentId, token) in timelines.takeTailFetches() {
+            Task {
+                do {
+                    let page = try await client.fetchTimeline(agentId: agentId)
+                    timelines.tailFetched(page, agentId: agentId, token: token)
+                    if let agent = page.agent { agents[agent.id] = agent }
+                } catch {
+                    timelines.tailFailed(agentId: agentId, token: token, error: error.localizedDescription)
+                }
+            }
         }
     }
 
-    func reloadTimeline() async {
-        guard let client, let agentId = selectedAgentId else { return }
-        do {
-            let page = try await client.fetchTimeline(agentId: agentId)
-            guard agentId == selectedAgentId else { return }
-            timeline.replace(with: page)
-            if let agent = page.agent { agents[agent.id] = agent }
-            timelineError = nil
-        } catch {
-            guard agentId == selectedAgentId else { return }
-            timelineError = error.localizedDescription
-        }
+    func reloadTimeline(_ agentId: String) async {
+        timelines.requestReload(agentId)
+        fetchTails()
+        await subscriptionSync.flush()
     }
 
-    func loadOlder() async {
-        guard let client, let agentId = selectedAgentId, timeline.hasOlder, !isLoadingOlder,
-              let cursor = timeline.startCursor
-        else { return }
-        isLoadingOlder = true
-        defer { isLoadingOlder = false }
+    func loadOlder(_ agentId: String) async {
+        guard let client, let cursor = timelines.beginLoadingOlder(agentId) else { return }
         do {
             let page = try await client.fetchTimeline(agentId: agentId, direction: "before", cursor: cursor)
-            guard agentId == selectedAgentId else { return }
-            timeline.prepend(olderPage: page)
+            timelines.finishLoadingOlder(agentId, page: page)
         } catch {
+            timelines.finishLoadingOlder(agentId, page: nil)
             lastError = error.localizedDescription
         }
     }
@@ -313,11 +407,11 @@ final class AppModel {
     func send(_ text: String, to agentId: String) async {
         guard let client else { return }
         let messageId = UUID().uuidString.lowercased()
-        if agentId == selectedAgentId { timeline.addPendingUserMessage(text: text, messageId: messageId) }
+        timelines.addPendingUserMessage(text: text, messageId: messageId, agentId: agentId)
         do {
             try await client.sendMessage(agentId: agentId, text: text, messageId: messageId)
         } catch {
-            if agentId == selectedAgentId { timeline.removePendingUserMessage(messageId: messageId) }
+            timelines.removePendingUserMessage(messageId: messageId, agentId: agentId)
             lastError = error.localizedDescription
         }
     }
@@ -328,7 +422,16 @@ final class AppModel {
 
     func archive(_ agentId: String) async {
         await perform { try await $0.archiveAgent(agentId: agentId) }
-        if selectedAgentId == agentId { selectedAgentId = nil }
+        if selectedAgentId == agentId { clearSelection() }
+    }
+
+    /// Clears the selection when its target goes away. On macOS its workspace stays open.
+    private func clearSelection() {
+        #if os(macOS)
+        selection = lastWorkspaceId.flatMap { workspaces[$0] }.map { .workspace($0.id) }
+        #else
+        selection = nil
+        #endif
     }
 
     func setMode(_ modeId: String, for agentId: String) async {
@@ -363,7 +466,7 @@ final class AppModel {
         guard let client else { throw PaseoError.disconnected }
         let agent = try await client.createAgent(options)
         agents[agent.id] = agent
-        selectedAgentId = agent.id
+        selection = .agent(agent.id)
     }
 
     private func perform(_ action: (DaemonClient) async throws -> Void) async {
@@ -380,20 +483,12 @@ final class AppModel {
 
     // MARK: Persistence
 
-    // The URL lives in UserDefaults; the password goes to the Keychain.
+    // Saved hosts live in UserDefaults; passwords and relay keys go to the Keychain.
     private static func loadEndpoint() -> DaemonEndpoint? {
-        guard let url = UserDefaults.standard.string(forKey: "endpointURL") else { return nil }
-        return DaemonEndpoint(url: url, password: Keychain.password(for: url))
+        HostStore.shared.currentEndpoint
     }
 
     private static func saveEndpoint(_ endpoint: DaemonEndpoint?) {
-        let previous = UserDefaults.standard.string(forKey: "endpointURL")
-        if let previous, previous != endpoint?.url { Keychain.setPassword(nil, for: previous) }
-        if let endpoint {
-            UserDefaults.standard.set(endpoint.url, forKey: "endpointURL")
-            Keychain.setPassword(endpoint.password, for: endpoint.url)
-        } else {
-            UserDefaults.standard.removeObject(forKey: "endpointURL")
-        }
+        HostStore.shared.setCurrent(endpoint)
     }
 }

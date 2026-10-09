@@ -70,9 +70,13 @@ final class PluginStore {
     private(set) var revision = 0
     private(set) var titles: [String: String] = [:]
     private(set) var registryWebView: WKWebView?
+    /// The pane shown in the detail column (or a sheet on iPhone). On macOS, workspace panels
+    /// open as workspace tabs instead, see `tabRequest`.
     var activePane: PluginPaneTarget? {
         didSet { if oldValue != activePane { syncCurrentScreen() } }
     }
+    /// A panel waiting for its workspace's tab view to open it (macOS).
+    var tabRequest: PluginPaneTarget?
     var lastError: String?
     #if DEBUG
     private(set) var bridgeLog: [String] = []
@@ -195,8 +199,22 @@ final class PluginStore {
     }
 
     func open(_ target: PluginPaneTarget) {
+        #if os(macOS)
+        if case .panel(_, let workspaceId, _) = target.kind, app?.workspaces[workspaceId] != nil {
+            activePane = nil
+            tabRequest = target
+            if app?.selectedWorkspace?.id != workspaceId { app?.selection = .workspace(workspaceId) }
+            return
+        }
+        #endif
         activePane = target
-        app?.selectedAgentId = nil
+        app?.selection = nil
+    }
+
+    /// Whether a saved plugin tab should stay: unknown until the catalog loads, then only if the
+    /// plugin still has client UI.
+    func keepsTab(for target: PluginPaneTarget) -> Bool {
+        catalog.isEmpty || catalog.contains { $0.id == target.pluginId && $0.hasClient }
     }
 
     func title(for target: PluginPaneTarget) -> String {
@@ -380,14 +398,16 @@ extension PluginStore: PluginRuntimeHost {
         case "openAgent":
             guard let agentId = message["agentId"]?.stringValue, app?.agents[agentId] != nil else { return }
             activePane = nil
-            app?.selectedAgentId = agentId
+            app?.selection = .agent(agentId)
         case "openWorkspace":
-            // The app has no workspace view; open its most recent agent instead.
-            guard let workspace = message["workspaceId"]?.stringValue.flatMap({ app?.workspaces[$0] }),
-                  let agent = app?.agents(in: workspace).first
-            else { return }
+            guard let workspace = message["workspaceId"]?.stringValue.flatMap({ app?.workspaces[$0] }) else { return }
             activePane = nil
-            app?.selectedAgentId = agent.id
+            #if os(macOS)
+            app?.selection = .workspace(workspace.id)
+            #else
+            // iOS has no workspace view; open its most recent agent instead.
+            if let agent = app?.agents(in: workspace).first { app?.selection = .agent(agent.id) }
+            #endif
         case "title":
             if case .pane(let target) = runtime.mode, let title = message["title"]?.stringValue { titles[target.id] = title }
         case "rpc":

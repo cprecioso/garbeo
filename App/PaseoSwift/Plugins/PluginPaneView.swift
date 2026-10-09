@@ -122,3 +122,17 @@ struct PluginRegistryHost: View {
         }
     }
 }
+
+/// A plugin workspace panel as a workspace tab (macOS split panes).
+struct PluginTab: WorkspaceTabKind {
+    var target: PluginPaneTarget
+
+    func label(in model: AppModel) -> WorkspaceTabLabel? {
+        guard model.plugins.keepsTab(for: target) else { return nil }
+        return WorkspaceTabLabel(title: model.plugins.title(for: target), icon: model.plugins.symbol(for: target))
+    }
+
+    func makeContent(in model: AppModel) -> some View {
+        PluginPaneView(target: target)
+    }
+}

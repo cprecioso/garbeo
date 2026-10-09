@@ -2,10 +2,46 @@ import PaseoKit
 import SwiftUI
 
 struct AgentDetailView: View {
+    /// `.window` drives the window's title and toolbar; `.pane` (one of several workspace panes)
+    /// draws its own compact header instead.
+    enum Chrome { case window, pane }
+
     @Environment(AppModel.self) private var model
     let agent: Agent
+    var chrome: Chrome = .window
+    /// Identifies this view in the model's visible-agent set, so the same agent can be open in
+    /// several panes and each mount/unmount is counted separately.
+    @State private var viewerId = UUID()
 
     var body: some View {
+        content
+            .onAppear { model.showTimeline(agent.id, viewer: viewerId) }
+            .onDisappear { model.hideTimeline(viewer: viewerId) }
+            .onChange(of: agent.id) { _, agentId in model.showTimeline(agentId, viewer: viewerId) }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch chrome {
+        case .window:
+            main
+                .navigationTitle(agent.displayTitle)
+                #if os(macOS)
+                .navigationSubtitle(subtitle)
+                #else
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar { AgentToolbar(agent: agent) }
+                .toolbar { PluginAgentToolbar(agent: agent) }
+        case .pane:
+            VStack(spacing: 0) {
+                AgentPaneHeader(agent: agent, subtitle: subtitle)
+                Divider()
+                main
+            }
+        }
+    }
+
+    private var main: some View {
         VStack(spacing: 0) {
             TimelineView(agent: agent)
             let permissions = model.pendingPermissions(for: agent.id)
@@ -18,14 +54,6 @@ struct AgentDetailView: View {
             }
             ComposerView(agent: agent)
         }
-        .navigationTitle(agent.displayTitle)
-        #if os(macOS)
-        .navigationSubtitle(subtitle)
-        #else
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar { AgentToolbar(agent: agent) }
-        .toolbar { PluginAgentToolbar(agent: agent) }
     }
 
     private var subtitle: String {
@@ -35,46 +63,120 @@ struct AgentDetailView: View {
 }
 
 private struct AgentToolbar: ToolbarContent {
-    @Environment(AppModel.self) private var model
     let agent: Agent
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if let modes = agent.availableModes, !modes.isEmpty {
-                Menu {
-                    ForEach(modes) { mode in
-                        Button {
-                            Task { await model.setMode(mode.id, for: agent.id) }
-                        } label: {
-                            if mode.id == agent.currentModeId {
-                                Label(mode.label, systemImage: "checkmark")
-                            } else {
-                                Text(mode.label)
-                            }
-                        }
-                        .help(mode.description ?? "")
-                    }
-                } label: {
-                    Label(agent.currentMode?.label ?? "Mode", systemImage: "shield.lefthalf.filled")
-                        .labelStyle(.titleAndIcon)
-                }
-                .help("Permission mode")
+            ModeMenu(agent: agent)
+                .labelStyle(.titleAndIcon)
+            ContextGauge(agent: agent)
+            AgentMoreMenu(agent: agent)
+        }
+    }
+}
+
+/// Title row for an agent shown inside a workspace pane, where the window toolbar belongs to the
+/// workspace rather than to any one agent.
+private struct AgentPaneHeader: View {
+    @Environment(AppModel.self) private var model
+    let agent: Agent
+    let subtitle: String
+    /// Panes can be as narrow as 100pt; controls collapse so they never force the pane wider.
+    @State private var width: CGFloat = 1000
+
+    var body: some View {
+        HStack(spacing: 8) {
+            StatusIndicator(agent: agent, hasPermission: !model.pendingPermissions(for: agent.id).isEmpty)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(agent.displayTitle).font(.headline).lineLimit(1)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
-            if let usage = agent.lastUsage, let used = usage.contextWindowUsedTokens, let max = usage.contextWindowMaxTokens, max > 0 {
-                Gauge(value: Double(used), in: 0...Double(max)) {
-                    Text("Context")
-                }
-                .gaugeStyle(.accessoryCircularCapacity)
-                .scaleEffect(0.5)
-                .frame(width: 28, height: 28)
-                .help("Context: \(used.formatted()) / \(max.formatted()) tokens")
+            Spacer(minLength: 0)
+            if width >= 300 {
+                ModeMenu(agent: agent)
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .labelStyle(width >= 460 ? AnyLabelStyle(.titleAndIcon) : AnyLabelStyle(.iconOnly))
+                    .fixedSize()
+                ContextGauge(agent: agent)
             }
+            AgentMoreMenu(agent: agent)
+                .menuStyle(.button)
+                .buttonStyle(.borderless)
+                .menuIndicator(.hidden)
+                .labelStyle(width >= 460 ? AnyLabelStyle(.titleAndIcon) : AnyLabelStyle(.iconOnly))
+                .fixedSize()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(minWidth: 0, maxWidth: .infinity)
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
+    }
+}
+
+private struct AnyLabelStyle: LabelStyle {
+    private let make: (Configuration) -> AnyView
+
+    init(_ style: some LabelStyle) {
+        make = { AnyView(style.makeBody(configuration: $0)) }
+    }
+
+    func makeBody(configuration: Configuration) -> some View { make(configuration) }
+}
+
+private struct ModeMenu: View {
+    @Environment(AppModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        if let modes = agent.availableModes, !modes.isEmpty {
             Menu {
-                Button("Reload Timeline", systemImage: "arrow.clockwise") { Task { await model.reloadTimeline() } }
-                Button("Archive Agent", systemImage: "archivebox") { Task { await model.archive(agent.id) } }
+                ForEach(modes) { mode in
+                    Button {
+                        Task { await model.setMode(mode.id, for: agent.id) }
+                    } label: {
+                        if mode.id == agent.currentModeId {
+                            Label(mode.label, systemImage: "checkmark")
+                        } else {
+                            Text(mode.label)
+                        }
+                    }
+                    .help(mode.description ?? "")
+                }
             } label: {
-                Label("More", systemImage: "ellipsis.circle")
+                Label(agent.currentMode?.label ?? "Mode", systemImage: "shield.lefthalf.filled")
             }
+            .help("Permission mode")
+        }
+    }
+}
+
+private struct ContextGauge: View {
+    let agent: Agent
+
+    var body: some View {
+        if let usage = agent.lastUsage, let used = usage.contextWindowUsedTokens, let max = usage.contextWindowMaxTokens, max > 0 {
+            Gauge(value: Double(used), in: 0...Double(max)) {
+                Text("Context")
+            }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .scaleEffect(0.5)
+            .frame(width: 28, height: 28)
+            .help("Context: \(used.formatted()) / \(max.formatted()) tokens")
+        }
+    }
+}
+
+private struct AgentMoreMenu: View {
+    @Environment(AppModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        Menu {
+            Button("Reload Timeline", systemImage: "arrow.clockwise") { Task { await model.reloadTimeline(agent.id) } }
+            Button("Archive Agent", systemImage: "archivebox") { Task { await model.archive(agent.id) } }
+        } label: {
+            Label("More", systemImage: "ellipsis.circle")
         }
     }
 }
@@ -86,26 +188,27 @@ private struct TimelineView: View {
     let agent: Agent
 
     var body: some View {
-        let timeline = model.timeline
+        let live = model.timelines[agent.id]
+        let timeline = live?.timeline ?? AgentTimeline()
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if timeline.hasOlder {
                     Button {
-                        Task { await model.loadOlder() }
+                        Task { await model.loadOlder(agent.id) }
                     } label: {
-                        if model.isLoadingOlder { ProgressView().controlSize(.small) } else { Text("Load earlier messages") }
+                        if live?.isLoadingOlder == true { ProgressView().controlSize(.small) } else { Text("Load earlier messages") }
                     }
                     .buttonStyle(.borderless)
                     .frame(maxWidth: .infinity)
                 }
                 if !timeline.isLoaded {
-                    if let error = model.timelineError {
+                    if let error = model.timelineError(for: agent.id) {
                         ContentUnavailableView {
                             Label("Couldn't load timeline", systemImage: "exclamationmark.bubble")
                         } description: {
                             Text(error)
                         } actions: {
-                            Button("Retry") { Task { await model.reloadTimeline() } }
+                            Button("Retry") { Task { await model.reloadTimeline(agent.id) } }
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
