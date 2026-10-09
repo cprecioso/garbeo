@@ -32,7 +32,6 @@ jobs:
     if: ${{ fromJson(needs.release-please.outputs.releases_created) }}
     needs: release-please
     uses: ./.github/workflows/dmg.yaml
-    secrets: inherit
     with:
       version: ${{ needs.release-please.outputs.version }}
 

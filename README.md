@@ -50,7 +50,7 @@ Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
 Tests/PaseoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter
 Tests/PaseoSyntaxTests/  every grammar downloads and highlights a sample; precedence, injections, diffs, language detection
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
-Scripts/build-dmg.sh     signed, notarized release DMG (see [Releases](#releases))
+Scripts/build-dmg.sh     release DMG (see [Releases](#releases))
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
 App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
 App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner
@@ -122,16 +122,9 @@ The write tests create agents. When the daemon creates a workspace for them, cle
 
 ## Releases
 
-[release-please](https://github.com/googleapis/release-please) keeps a release PR open on `main`, built from [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`; with squash merges, the PR title). Merging it bumps `MARKETING_VERSION` in the project (the line marked `x-release-please-version`), tags the release, and attaches a DMG signed with Developer ID and notarized (`.github/workflows/cd.yaml`). The DMG is built by `Scripts/build-dmg.sh` on the `xcode-27` runner; running the Build DMG workflow by hand uploads it as an artifact instead.
+[release-please](https://github.com/googleapis/release-please) keeps a release PR open on `main`, built from [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`; with squash merges, the PR title). Merging it bumps `MARKETING_VERSION` in the project (the line marked `x-release-please-version`), tags the release, and attaches a DMG (`.github/workflows/cd.yaml`). The DMG is built by `Scripts/build-dmg.sh` on the `xcode-27` runner (locally it writes `build/PaseoSwift-<version>.dmg`); running the Build DMG workflow by hand uploads it as an artifact instead.
 
-Repository secrets:
-
-- `DEVELOPER_ID_CERTIFICATE`: a Developer ID Application certificate and its private key exported as `.p12`, base64-encoded (`base64 -i cert.p12 | pbcopy`)
-- `DEVELOPER_ID_CERTIFICATE_PASSWORD`: the `.p12` export password
-- `APPLE_TEAM_ID`: the team ID (the certificate's OU)
-- `NOTARY_KEY`, `NOTARY_KEY_ID`, `NOTARY_ISSUER`: an App Store Connect API key (contents of the `.p8`), its key ID and issuer ID
-
-Locally: `DEVELOPMENT_TEAM=<team ID> Scripts/build-dmg.sh` writes `build/PaseoSwift-<version>.dmg`. Without a Developer ID certificate, add `SIGN_IDENTITY="Apple Development"`; set `NOTARY_KEY_PATH`, `NOTARY_KEY_ID` and `NOTARY_ISSUER` to notarize.
+The app is ad-hoc signed and not notarized, so macOS blocks it on first launch. Allow it under System Settings → Privacy & Security → Open Anyway, or run `xattr -dr com.apple.quarantine /Applications/PaseoSwift.app`.
 
 ## Protocol notes
 
