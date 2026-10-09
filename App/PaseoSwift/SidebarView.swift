@@ -7,7 +7,8 @@ struct SidebarView: View {
     @State private var search = ""
 
     var body: some View {
-        List(selection: selection) {
+        @Bindable var model = model
+        List(selection: $model.selection) {
             ConnectionBanner()
 
             ForEach(model.projects) { project in
@@ -26,7 +27,7 @@ struct SidebarView: View {
             let unplaced = model.unplacedAgents.filter(matches)
             if !unplaced.isEmpty {
                 Section("Other agents") {
-                    ForEach(unplaced) { AgentRow(agent: $0).tag($0.id) }
+                    ForEach(unplaced) { AgentRow(agent: $0).tag(SidebarSelection.agent($0.id)) }
                 }
             }
         }
@@ -55,21 +56,6 @@ struct SidebarView: View {
             #endif
         }
         .refreshable { model.retryNow() }
-    }
-
-    /// Rows are tagged with agent ids, or `terminal:<id>` for terminals; one selection drives the detail column.
-    private var selection: Binding<String?> {
-        Binding {
-            model.terminals.selectedTerminalId.map { TerminalRow.tagPrefix + $0 } ?? model.selectedAgentId
-        } set: { value in
-            if let value, value.hasPrefix(TerminalRow.tagPrefix) {
-                model.selectedAgentId = nil
-                model.terminals.selectedTerminalId = String(value.dropFirst(TerminalRow.tagPrefix.count))
-            } else {
-                model.selectedAgentId = value
-                model.terminals.selectedTerminalId = nil
-            }
-        }
     }
 
     private func matches(_ workspace: Workspace) -> Bool {
@@ -118,8 +104,8 @@ private struct WorkspaceSection: View {
             if agents.isEmpty && terminals.isEmpty {
                 Text("No agents").font(.caption).foregroundStyle(.tertiary)
             }
-            ForEach(agents) { AgentRow(agent: $0).tag($0.id) }
-            ForEach(terminals) { TerminalRow(terminal: $0).tag(TerminalRow.tagPrefix + $0.id) }
+            ForEach(agents) { AgentRow(agent: $0).tag(SidebarSelection.agent($0.id)) }
+            ForEach(terminals) { TerminalRow(terminal: $0).tag(SidebarSelection.terminal($0.id)) }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: workspace.workspaceKind == "worktree" ? "arrow.triangle.branch" : "folder")
@@ -137,6 +123,10 @@ private struct WorkspaceSection: View {
                 }
             }
         }
+        #if os(macOS)
+        // On macOS a workspace opens as tabs and split panes.
+        .tag(SidebarSelection.workspace(workspace.id))
+        #endif
     }
 }
 

@@ -2,12 +2,17 @@ import Foundation
 import Observation
 import PaseoKit
 
-/// Workspace terminals, kept current through one `subscribe_terminals_request` per workspace,
-/// plus which terminal is open in the detail column.
+/// Workspace terminals, kept current through one `subscribe_terminals_request` per workspace.
 @MainActor @Observable
 final class TerminalDirectory {
     private(set) var byWorkspace: [String: [TerminalInfo]] = [:]
-    var selectedTerminalId: String?
+    /// Reads and writes the app's selection (`AppModel.selection`), so terminals and agents share
+    /// one selection. Set by `AppModel`.
+    @ObservationIgnored var selection: (get: @MainActor () -> String?, set: @MainActor (String?) -> Void) = ({ nil }, { _ in })
+    var selectedTerminalId: String? {
+        get { selection.get() }
+        set { selection.set(newValue) }
+    }
     @ObservationIgnored var onError: ((String) -> Void)?
 
     @ObservationIgnored private var client: DaemonClient?

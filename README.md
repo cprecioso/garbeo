@@ -8,6 +8,7 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Pair through the Paseo relay: scan the QR code from `paseo daemon pair` / Paseo Desktop (iOS), or paste the pairing link (both platforms). Traffic is end-to-end encrypted (Curve25519 + XSalsa20-Poly1305, wire-compatible with the official apps)
 - Saved hosts list; relay daemon keys and passwords live in the Keychain. The sidebar footer shows whether the connection is direct or relayed
 - Live sidebar: projects → workspaces → agents, with status, diff stats, and permission badges, kept in sync through daemon subscriptions
+- macOS workspaces as tabs (one per agent to start) that drag into nested horizontal/vertical split panes ([Bonsplit](https://bonsplit.alasdairmonk.com/)), each pane with its own live timeline. Layouts persist per workspace across launches
 - Agent timeline: markdown replies, collapsible reasoning, tool calls (shell, read, edit diffs, search, fetch, sub-agents), task lists, errors. Streams live, with "load earlier" paging
 - Send messages (optimistic, confirmed when the daemon echoes them), stop a running turn, change permission mode, archive
 - Answer permission requests inline (provider-supplied actions or Allow/Deny)
@@ -27,6 +28,7 @@ Sources/PaseoKit/
   Pairing.swift          pairing offers (#offer=), relay:// connection URIs, relay WebSocket URLs
   Models.swift           tolerant Decodable wire models (unknown fields and enum values are fine)
   Timeline.swift         merges live agent_stream deltas into projected pages; detects seq gaps
+  TimelineSubscriptions.swift  per-agent live timelines for every visible agent; serialized set_subscription
   TerminalFrames.swift   terminal binary frame codec, snapshot → ANSI renderer
   Terminals.swift        terminal requests, slot-routed output streams
 Sources/PaseoTerminal/   PaseoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
@@ -35,9 +37,16 @@ Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
   Fixtures/terminal-vectors.json  terminal codec vectors generated from the upstream TypeScript
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
-App/PaseoSwift.xcodeproj multiplatform SwiftUI app target
+App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Bonsplit linked on macOS only)
 App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner
+  Workspace/             workspace tabs: tab content model, saved layout, Bonsplit integration (macOS)
 ```
+
+## Workspace tabs and panes (macOS)
+
+Selecting a workspace in the sidebar opens it as tabs; selecting an agent or terminal focuses (or opens) its tab, and the sidebar follows the focused tab. Tabs show agents (`AgentTab`) and terminals (`TerminalTab`); the toolbar's Open Tab menu lists both and creates terminals. A terminal tab only takes keyboard focus, and with it the PTY size claim, when it was just selected, not when restored. Drag a tab onto a pane's edge to split, onto its center or another tab bar to move it; the tab bar's split buttons create an empty pane. Bonsplit owns the tree; `WorkspaceTabs` maps its tabs to `WorkspaceTabContent` and saves the layout (derived from `treeSnapshot()`) to UserDefaults per daemon and workspace.
+
+To add a tab kind (plugin webview, …), write a struct conforming to `WorkspaceTabKind` (a label and a content view) and add one `case` plus its `kind` arm to `WorkspaceTabContent` in `Workspace/WorkspaceTabContent.swift`. Tab bar, splits, drag and drop and persistence need nothing else.
 
 ## Build and run
 
@@ -80,12 +89,12 @@ The write tests create agents. When the daemon creates a workspace for them, cle
 
 ## Protocol notes
 
-Speaks protocol version 1 as defined in `packages/protocol/src/messages.ts` of [getpaseo/paseo](https://github.com/getpaseo/paseo). The client advertises `owned_subscriptions`, `explicit_event_subscriptions`, and `selective_agent_timeline`, so it only receives streams for the agent being viewed:
+Speaks protocol version 1 as defined in `packages/protocol/src/messages.ts` of [getpaseo/paseo](https://github.com/getpaseo/paseo). The client advertises `owned_subscriptions`, `explicit_event_subscriptions`, and `selective_agent_timeline`, so it only receives streams for the agents on screen:
 
 1. `hello` → `status.server_info` (or `hello.rejected`)
 2. `fetch_workspaces_request` / `fetch_agents_request` with `subscribe: {}` → `workspace_update` / `agent_update`
 3. `session.events.set_subscription.request` for permission events
-4. `agent.timeline.set_subscription.request` + `fetch_agent_timeline_request` (tail) for the open agent; `agent_stream` deltas are merged by `seq`, and a gap or epoch change refetches the tail
+4. `agent.timeline.set_subscription.request` with the full set of visible agents (every mounted agent view, so all panes on macOS), sent one at a time and coalesced since each call replaces the set. Once acknowledged, `fetch_agent_timeline_request` (tail) runs for newly covered agents; `agent_stream` deltas are merged by `seq`, and a gap or epoch change refetches the tail
 5. Terminals: `list_terminals_request` once, then `subscribe_terminals_request` per workspace for `terminals_changed`. Opening a terminal sends `subscribe_terminal_request` with `restore: visible-snapshot` (when the daemon has `terminal-restore-modes`); the response assigns a slot, and binary frames (`[opcode, slot, payload]`) carry Output/Restore down and Input/Resize up. The slot is bound while the response frame is handled, so the Restore frame right behind it is never dropped. Legacy JSON `Snapshot` frames are rendered to ANSI client-side. The client advertises `terminal_reflowable_snapshot`
 
 PTY size is last-interacting-client-wins: attaching and passive layout never resize. Focusing, clicking or tapping the terminal, returning to its window, or typing after 5s idle sends a `claim`; later grid changes send an `update`, which the daemon ignores if another client has claimed since.
@@ -112,4 +121,7 @@ Relay connections (`packages/relay`, `packages/protocol/src/connection-offer.ts`
 - `-PaseoPairingLink <url>` pairs with a relay pairing link and connects on launch
 - `-PaseoSelectTerminal first|<terminalId>|new` opens a terminal on launch (`new` creates one in the first workspace; throwaway daemons only)
 - `-PaseoResizeWindow 900x500` (macOS, with `-PaseoSnapshot`) resizes the window and takes a third snapshot
-- `-PaseoSnapshot /path/prefix` writes a state summary (and on macOS a window PNG) after launch
+- `-PaseoSelectWorkspace first|<workspaceId>` opens a workspace on launch (macOS: tabbed view)
+- `-PaseoTerminalPassive YES` (macOS) terminal tabs never take focus, so attaching never claims the PTY size (for read-only runs against a live daemon)
+- `-PaseoSplit horizontal[:0.3][,vertical…]` (macOS) splits the focused pane per entry and moves a hidden tab into each new pane, as a drag would
+- `-PaseoSnapshot /path/prefix` writes a state summary (visible timelines, subscription, workspace layout) and on macOS a window PNG after launch

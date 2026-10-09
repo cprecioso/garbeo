@@ -112,7 +112,7 @@ struct NewAgentView: View {
 
     private func loadProviders() async {
         if workspaceId == nil {
-            workspaceId = model.selectedAgent?.workspaceId.flatMap { model.workspaces[$0]?.id } ?? workspaces.first?.id
+            workspaceId = model.selectedWorkspace?.id ?? workspaces.first?.id
         }
         do {
             providers = try await model.providers()

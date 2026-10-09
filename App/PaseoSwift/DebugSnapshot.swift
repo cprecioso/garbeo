@@ -6,17 +6,20 @@ import Foundation
 import PaseoKit
 
 /// Development aid: launch with `-PaseoSnapshot /path/prefix` to write PNGs of the key window
-/// (and a state summary) a few seconds after launch, and again after `-PaseoSelectAgent`/`-PaseoSelectTerminal` applies.
+/// (and a state summary) a few seconds after launch, and again after `-PaseoSelectAgent` /
+/// `-PaseoSelectWorkspace` / `-PaseoSelectTerminal` apply.
 @MainActor
 enum DebugSnapshot {
+    /// Describes the workspace view on screen (tabs, panes, layout); set by `WorkspaceView`.
+    static var describeWorkspace: (() -> String)?
+
     static func scheduleIfRequested(model: AppModel) {
         guard let prefix = UserDefaults.standard.string(forKey: "PaseoSnapshot") else { return }
         Task {
             try? await Task.sleep(for: .seconds(4))
             capture(to: prefix + "-1.png", model: model)
-            if UserDefaults.standard.string(forKey: "PaseoSelectAgent") != nil
-                || UserDefaults.standard.string(forKey: "PaseoSelectTerminal") != nil
-            {
+            let defaults = UserDefaults.standard
+            if ["PaseoSelectAgent", "PaseoSelectWorkspace", "PaseoSelectTerminal"].contains(where: { defaults.string(forKey: $0) != nil }) {
                 try? await Task.sleep(for: .seconds(4))
                 capture(to: prefix + "-2.png", model: model)
             }
@@ -41,9 +44,13 @@ enum DebugSnapshot {
         projects: \(model.projects.map { "\($0.name)[\($0.workspaces.map { "\($0.displayName):\(model.agents(in: $0).count)" }.joined(separator: ","))]" })
         unplaced: \(model.unplacedAgents.count)
         workspaces: \(model.workspaces.count) agents: \(model.agents.count)
-        selected: \(model.selectedAgentId ?? "-") firstRows: \(model.timeline.rows.prefix(3).map(\.id)) hasOlder: \(model.timeline.hasOlder) timelineRows: \(model.timeline.rows.count) loaded: \(model.timeline.isLoaded)
-        timelineError: \(model.timelineError ?? "-")
+        selection: \(model.selection.map { "\($0)" } ?? "-")
+        visibleTimelines: \(model.timelines.visibleAgentIds) subscribed: \(model.timelines.subscribed.sorted())
+        \(model.timelines.timelines.sorted { $0.key < $1.key }.map { id, live in
+            "timeline \(id): rows=\(live.timeline.rows.count) loaded=\(live.timeline.isLoaded) needsTail=\(live.needsTail) hasOlder=\(live.timeline.hasOlder) error=\(live.error ?? "-")"
+        }.joined(separator: "\n"))
         terminals: \(model.terminals.byWorkspace.mapValues { $0.map(\.id) }) selectedTerminal: \(model.terminals.selectedTerminalId ?? "-")
+        \(describeWorkspace?() ?? "workspace: -")
         """
         #if os(iOS)
         try? summary.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
