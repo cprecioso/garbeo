@@ -78,7 +78,7 @@ final class PluginWebRuntime: NSObject {
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         #endif
         #if DEBUG
-        if #available(macOS 13.3, iOS 16.4, *) { webView.isInspectable = true }
+        webView.isInspectable = true
         #endif
         webView.load(URLRequest(url: URL(string: "\(Self.origin)/index.html")!))
     }
