@@ -57,9 +57,9 @@ extension WorkspaceTabKind {
         AnyView(makeContent(in: model))
     }
 
-    func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation? { nil }
+    @MainActor func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation? { nil }
 
-    func close(in model: AppModel, closeTab: () -> Void) async { closeTab() }
+    @MainActor func close(in model: AppModel, closeTab: () -> Void) async { closeTab() }
 }
 
 struct WorkspaceTabCloseConfirmation: Equatable {
