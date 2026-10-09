@@ -1,0 +1,391 @@
+import Foundation
+import Observation
+import PaseoKit
+
+enum ConnectionState: Equatable {
+    case idle
+    case connecting
+    case connected(ServerInfo)
+    case reconnecting(attempt: Int, error: String?)
+    case failed(String)
+
+    var isConnected: Bool { if case .connected = self { true } else { false } }
+}
+
+struct ProjectGroup: Identifiable {
+    var id: String
+    var name: String
+    var workspaces: [Workspace]
+}
+
+/// Owns the daemon connection and the replicated directory (workspaces, agents) plus the
+/// timeline of the agent being viewed.
+@MainActor @Observable
+final class AppModel {
+    private(set) var connection: ConnectionState = .idle
+    private(set) var workspaces: [String: Workspace] = [:]
+    private(set) var agents: [String: Agent] = [:]
+    private(set) var permissions: [String: [PermissionRequest]] = [:]
+    private(set) var timeline = AgentTimeline()
+    private(set) var timelineError: String?
+    private(set) var isLoadingOlder = false
+    var selectedAgentId: String? {
+        didSet { if oldValue != selectedAgentId { Task { await viewAgent(selectedAgentId) } } }
+    }
+    var lastError: String?
+
+    var endpoint: DaemonEndpoint? {
+        didSet { Self.saveEndpoint(endpoint) }
+    }
+
+    private var client: DaemonClient?
+    private var eventTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var generation = 0
+    private let clientId: String
+
+    init() {
+        let defaults = UserDefaults.standard
+        if let existing = defaults.string(forKey: "clientId") {
+            clientId = existing
+        } else {
+            clientId = "cid_swift_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            defaults.set(clientId, forKey: "clientId")
+        }
+        endpoint = Self.loadEndpoint()
+    }
+
+    // MARK: Derived state
+
+    var serverInfo: ServerInfo? {
+        if case .connected(let info) = connection { info } else { nil }
+    }
+
+    var selectedAgent: Agent? { selectedAgentId.flatMap { agents[$0] } }
+
+    var projects: [ProjectGroup] {
+        let grouped = Dictionary(grouping: workspaces.values, by: \.projectId)
+        return grouped.map { projectId, workspaces in
+            ProjectGroup(
+                id: projectId,
+                name: workspaces.first?.projectName ?? projectId,
+                workspaces: workspaces.sorted { ($0.sortDate ?? .distantPast) > ($1.sortDate ?? .distantPast) })
+        }
+        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    func agents(in workspace: Workspace) -> [Agent] {
+        agents.values
+            .filter { $0.archivedAt == nil && ($0.workspaceId == workspace.id || ($0.workspaceId == nil && $0.cwd == workspace.workspaceDirectory)) }
+            .sorted { ($0.updatedDate ?? .distantPast) > ($1.updatedDate ?? .distantPast) }
+    }
+
+    var unplacedAgents: [Agent] {
+        let directories = Set(workspaces.values.map(\.workspaceDirectory))
+        return agents.values
+            .filter { agent in
+                agent.archivedAt == nil && (agent.workspaceId.map { workspaces[$0] == nil } ?? true)
+                    && !directories.contains(agent.cwd)
+            }
+            .sorted { ($0.updatedDate ?? .distantPast) > ($1.updatedDate ?? .distantPast) }
+    }
+
+    func pendingPermissions(for agentId: String) -> [PermissionRequest] {
+        permissions[agentId] ?? []
+    }
+
+    var attentionCount: Int {
+        agents.values.filter { $0.archivedAt == nil && ($0.requiresAttention == true || !(permissions[$0.id] ?? []).isEmpty) }.count
+    }
+
+    // MARK: Connection lifecycle
+
+    func connect(to endpoint: DaemonEndpoint) async {
+        self.endpoint = endpoint
+        reconnectTask?.cancel()
+        await openConnection(isReconnect: false)
+    }
+
+    func disconnect() {
+        generation += 1
+        reconnectTask?.cancel()
+        eventTask?.cancel()
+        let old = client
+        client = nil
+        Task { await old?.disconnect() }
+        connection = .idle
+        workspaces = [:]
+        agents = [:]
+        permissions = [:]
+        timeline = AgentTimeline()
+        selectedAgentId = nil
+    }
+
+    func forgetEndpoint() {
+        disconnect()
+        endpoint = nil
+    }
+
+    private func openConnection(isReconnect: Bool, attempt: Int = 0) async {
+        guard let endpoint else { return }
+        generation += 1
+        let myGeneration = generation
+        eventTask?.cancel()
+        if let old = client { await old.disconnect() }
+
+        if !isReconnect { connection = .connecting }
+        let client = DaemonClient(endpoint: endpoint, clientId: clientId)
+        do {
+            let info = try await client.connect()
+            guard myGeneration == generation else { await client.disconnect(); return }
+            self.client = client
+            eventTask = Task { [weak self] in
+                for await event in client.events {
+                    guard let self, myGeneration == self.generation else { return }
+                    self.handle(event)
+                }
+            }
+            try await bootstrap(client)
+            guard myGeneration == generation else { return }
+            connection = .connected(info)
+        } catch {
+            guard myGeneration == generation else { return }
+            await client.disconnect()
+            let message = error.localizedDescription
+            if let paseoError = error as? PaseoError, case .helloRejected = paseoError {
+                connection = .failed(message)
+            } else if isReconnect || attempt > 0 {
+                scheduleReconnect(attempt: attempt + 1, error: message)
+            } else {
+                connection = .failed(message)
+            }
+        }
+    }
+
+    private func bootstrap(_ client: DaemonClient) async throws {
+        async let workspacesResponse = client.fetchWorkspaces()
+        async let agentsResponse = client.fetchAgents()
+        let (ws, ag) = try await (workspacesResponse, agentsResponse)
+        workspaces = Dictionary(ws.entries.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        let agentList = ag.entries.map(\.agent)
+        agents = Dictionary(agentList.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        permissions = Dictionary(agentList.compactMap { agent in
+            agent.pendingPermissions.flatMap { $0.isEmpty ? nil : (agent.id, $0) }
+        }, uniquingKeysWith: { _, last in last })
+        try await client.subscribeToSessionEvents([
+            "agent_permission_request", "agent_permission_resolved", "agent_attention_required",
+        ])
+        if let selectedAgentId, agents[selectedAgentId] != nil {
+            await viewAgent(selectedAgentId)
+        } else if selectedAgentId != nil {
+            selectedAgentId = nil
+        }
+        #if DEBUG
+        // Development aid: `-PaseoSelectAgent first|<agentId>` opens an agent on launch.
+        if selectedAgentId == nil, let requested = UserDefaults.standard.string(forKey: "PaseoSelectAgent") {
+            selectedAgentId = requested == "first"
+                ? projects.flatMap(\.workspaces).flatMap(agents(in:)).first?.id : requested
+        }
+        #endif
+    }
+
+    private func scheduleReconnect(attempt: Int, error: String?) {
+        connection = .reconnecting(attempt: attempt, error: error)
+        reconnectTask?.cancel()
+        let delay = min(30.0, pow(2.0, Double(min(attempt, 5))) * 0.5)
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            await self?.openConnection(isReconnect: true, attempt: attempt)
+        }
+    }
+
+    func retryNow() {
+        reconnectTask?.cancel()
+        Task { await openConnection(isReconnect: true, attempt: 1) }
+    }
+
+    // MARK: Events
+
+    private func handle(_ event: DaemonEvent) {
+        switch event {
+        case .agentUpdate(.upsert(let agent)):
+            agents[agent.id] = agent
+            if let pending = agent.pendingPermissions { permissions[agent.id] = pending }
+        case .agentUpdate(.remove(let agentId)):
+            agents[agentId] = nil
+            permissions[agentId] = nil
+            if selectedAgentId == agentId { selectedAgentId = nil }
+        case .workspaceUpdate(.upsert(let workspace)):
+            workspaces[workspace.id] = workspace
+        case .workspaceUpdate(.remove(let id)):
+            workspaces[id] = nil
+        case .agentStream(let payload):
+            handleStream(payload)
+        case .permissionRequested(let payload):
+            var list = permissions[payload.agentId] ?? []
+            list.removeAll { $0.id == payload.request.id }
+            list.append(payload.request)
+            permissions[payload.agentId] = list
+        case .permissionResolved(let payload):
+            permissions[payload.agentId]?.removeAll { $0.id == payload.requestId }
+        case .serverInfo(let info):
+            if connection.isConnected { connection = .connected(info) }
+        case .disconnected(let reason):
+            client = nil
+            scheduleReconnect(attempt: 1, error: reason)
+        case .agentUpdate(.unknown), .workspaceUpdate(.unknown):
+            break
+        }
+    }
+
+    private func handleStream(_ payload: AgentStreamPayload) {
+        guard payload.agentId == selectedAgentId else { return }
+        switch payload.event {
+        case .permissionRequested(let request):
+            var list = permissions[payload.agentId] ?? []
+            if !list.contains(where: { $0.id == request.id }) { list.append(request) }
+            permissions[payload.agentId] = list
+        case .permissionResolved(let requestId):
+            permissions[payload.agentId]?.removeAll { $0.id == requestId }
+        default:
+            break
+        }
+        if timeline.apply(payload) == .gap {
+            Task { await reloadTimeline() }
+        }
+    }
+
+    // MARK: Viewed agent
+
+    private func viewAgent(_ agentId: String?) async {
+        timeline = AgentTimeline()
+        timelineError = nil
+        guard let client else { return }
+        do {
+            try await client.setTimelineSubscription(agentIds: agentId.map { [$0] } ?? [])
+            guard agentId != nil else { return }
+            await reloadTimeline()
+        } catch {
+            timelineError = error.localizedDescription
+        }
+    }
+
+    func reloadTimeline() async {
+        guard let client, let agentId = selectedAgentId else { return }
+        do {
+            let page = try await client.fetchTimeline(agentId: agentId)
+            guard agentId == selectedAgentId else { return }
+            timeline.replace(with: page)
+            if let agent = page.agent { agents[agent.id] = agent }
+            timelineError = nil
+        } catch {
+            guard agentId == selectedAgentId else { return }
+            timelineError = error.localizedDescription
+        }
+    }
+
+    func loadOlder() async {
+        guard let client, let agentId = selectedAgentId, timeline.hasOlder, !isLoadingOlder,
+              let cursor = timeline.startCursor
+        else { return }
+        isLoadingOlder = true
+        defer { isLoadingOlder = false }
+        do {
+            let page = try await client.fetchTimeline(agentId: agentId, direction: "before", cursor: cursor)
+            guard agentId == selectedAgentId else { return }
+            timeline.prepend(olderPage: page)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    // MARK: Actions
+
+    func send(_ text: String, to agentId: String) async {
+        guard let client else { return }
+        let messageId = UUID().uuidString.lowercased()
+        if agentId == selectedAgentId { timeline.addPendingUserMessage(text: text, messageId: messageId) }
+        do {
+            try await client.sendMessage(agentId: agentId, text: text, messageId: messageId)
+        } catch {
+            if agentId == selectedAgentId { timeline.removePendingUserMessage(messageId: messageId) }
+            lastError = error.localizedDescription
+        }
+    }
+
+    func cancel(_ agentId: String) async {
+        await perform { try await $0.cancelAgent(agentId: agentId) }
+    }
+
+    func archive(_ agentId: String) async {
+        await perform { try await $0.archiveAgent(agentId: agentId) }
+        if selectedAgentId == agentId { selectedAgentId = nil }
+    }
+
+    func setMode(_ modeId: String, for agentId: String) async {
+        await perform { try await $0.setMode(agentId: agentId, modeId: modeId) }
+    }
+
+    func respond(to request: PermissionRequest, agentId: String, allow: Bool, actionId: String? = nil) async {
+        await perform {
+            try await $0.respondToPermission(
+                agentId: agentId, permissionId: request.id, allow: allow, actionId: actionId,
+                message: allow ? nil : "Denied from Paseo Swift")
+        }
+        permissions[agentId]?.removeAll { $0.id == request.id }
+    }
+
+    func providers() async throws -> [ProviderAvailability] {
+        guard let client else { throw PaseoError.disconnected }
+        return try await client.listProviders()
+    }
+
+    func models(provider: String, cwd: String?) async throws -> [ProviderModel] {
+        guard let client else { throw PaseoError.disconnected }
+        return try await client.listModels(provider: provider, cwd: cwd)
+    }
+
+    func modes(provider: String, cwd: String?) async throws -> [AgentMode] {
+        guard let client else { throw PaseoError.disconnected }
+        return try await client.listModes(provider: provider, cwd: cwd)
+    }
+
+    func createAgent(_ options: DaemonClient.CreateAgentOptions) async throws {
+        guard let client else { throw PaseoError.disconnected }
+        let agent = try await client.createAgent(options)
+        agents[agent.id] = agent
+        selectedAgentId = agent.id
+    }
+
+    private func perform(_ action: (DaemonClient) async throws -> Void) async {
+        guard let client else {
+            lastError = PaseoError.disconnected.localizedDescription
+            return
+        }
+        do {
+            try await action(client)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    // MARK: Persistence
+
+    // The URL lives in UserDefaults; the password goes to the Keychain.
+    private static func loadEndpoint() -> DaemonEndpoint? {
+        guard let url = UserDefaults.standard.string(forKey: "endpointURL") else { return nil }
+        return DaemonEndpoint(url: url, password: Keychain.password(for: url))
+    }
+
+    private static func saveEndpoint(_ endpoint: DaemonEndpoint?) {
+        let previous = UserDefaults.standard.string(forKey: "endpointURL")
+        if let previous, previous != endpoint?.url { Keychain.setPassword(nil, for: previous) }
+        if let endpoint {
+            UserDefaults.standard.set(endpoint.url, forKey: "endpointURL")
+            Keychain.setPassword(endpoint.password, for: endpoint.url)
+        } else {
+            UserDefaults.standard.removeObject(forKey: "endpointURL")
+        }
+    }
+}
