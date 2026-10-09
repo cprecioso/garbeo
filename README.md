@@ -4,7 +4,7 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 
 ## Features
 
-- Connect to a daemon by address (`127.0.0.1:6767`, `host:port`, `ws(s)://…`), with an optional password stored in the Keychain
+- Connect to a daemon by address (`127.0.0.1:6767`, `host:port`, `ws(s)://…`), with an optional password stored in the Keychain. When a daemon answers on `127.0.0.1:6767` (`/api/health`, polled while the connect screen is up) and isn't saved yet, the connect screen offers a one-click Connect
 - Pair through the Paseo relay: scan the QR code from `paseo daemon pair` / Paseo Desktop (iOS), or paste the pairing link (both platforms). Traffic is end-to-end encrypted (Curve25519 + XSalsa20-Poly1305, wire-compatible with the official apps)
 - Saved hosts list; relay daemon keys and passwords live in the Keychain. The sidebar footer shows whether the connection is direct or relayed
 - Live sidebar: projects → workspaces (iOS: → agents and terminals), with status, diff stats, and permission badges, kept in sync through daemon subscriptions
