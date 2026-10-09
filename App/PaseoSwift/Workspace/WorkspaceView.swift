@@ -10,6 +10,8 @@ struct WorkspaceView: View {
     let tabs: WorkspaceTabs
     @Binding var showingNewAgent: Bool
     @State private var pendingClose: PendingClose?
+    /// Tabs being closed; a subagent's tab stays open until the daemon accepts it's no longer shown.
+    @State private var closing: Set<WorkspaceTabContent> = []
 
     private struct PendingClose {
         var content: WorkspaceTabContent
@@ -40,8 +42,16 @@ struct WorkspaceView: View {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Section("Agents") {
-                        ForEach(agents) { agent in
+                        ForEach(agents.filter(model.isWorkspaceRoot)) { agent in
                             Button(agent.displayTitle) { tabs.open(.agent(AgentTab(agentId: agent.id))) }
+                        }
+                    }
+                    let subagents = agents.filter { !model.isWorkspaceRoot($0) }
+                    if !subagents.isEmpty {
+                        Section("Subagents") {
+                            ForEach(subagents) { agent in
+                                Button(agent.displayTitle) { tabs.open(.agent(AgentTab(agentId: agent.id))) }
+                            }
                         }
                     }
                     Section("Terminals") {
@@ -67,6 +77,18 @@ struct WorkspaceView: View {
             #endif
         }
         .onChange(of: model.tabMembers(of: workspace)) { _, members in tabs.reconcile(members: members) }
+        .task(id: subagentTabsToMark) {
+            // Tell the daemon which subagents this client shows in tabs, retrying until it accepts.
+            var remaining = subagentTabsToMark
+            while !remaining.isEmpty, !Task.isCancelled {
+                var failed: [String] = []
+                for agentId in remaining {
+                    do { try await model.setOpenTab(true, for: agentId) } catch { failed.append(agentId) }
+                }
+                remaining = failed
+                if !remaining.isEmpty { try? await Task.sleep(for: .seconds(2)) }
+            }
+        }
         .onChange(of: tabs.closeRequest) { _, content in
             guard let content else { return }
             tabs.closeRequest = nil
@@ -114,10 +136,24 @@ struct WorkspaceView: View {
         }
     }
 
-    /// Closes the tab, then archives its agent or kills its terminal.
+    /// Closes the tab the way its kind does it (archiving its agent, killing its terminal…).
     private func close(_ content: WorkspaceTabContent) {
-        tabs.close(content)
-        Task { await content.kind.close(in: model) }
+        closing.insert(content)
+        Task {
+            await content.kind.close(in: model) { tabs.close(content) }
+            closing.remove(content)
+        }
+    }
+
+    /// Subagents open in a tab here that the daemon doesn't know this client shows.
+    private var subagentTabsToMark: [String] {
+        tabs.contents.values.compactMap { content -> String? in
+            guard !closing.contains(content), case .agent(let tab) = content, let agent = model.agents[tab.agentId], agent.parentAgentId != nil,
+                  agent.labels[model.openTabLabel] != "true"
+            else { return nil }
+            return agent.id
+        }
+        .sorted()
     }
 }
 

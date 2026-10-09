@@ -47,9 +47,9 @@ protocol WorkspaceTabKind: Hashable, Codable, Sendable {
     /// Asked for before the user closes the tab; nil closes it right away. Default: nil.
     @MainActor func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation?
 
-    /// What closing the tab does to its target (archive the agent, kill the terminal). The tab
-    /// stays closed meanwhile. Default: nothing.
-    @MainActor func close(in model: AppModel) async
+    /// Closes the tab by calling `closeTab`, and does what that means for its target (archive the
+    /// agent, kill the terminal). Default: just closes the tab.
+    @MainActor func close(in model: AppModel, closeTab: () -> Void) async
 }
 
 extension WorkspaceTabKind {
@@ -59,7 +59,7 @@ extension WorkspaceTabKind {
 
     func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation? { nil }
 
-    func close(in model: AppModel) async {}
+    func close(in model: AppModel, closeTab: () -> Void) async { closeTab() }
 }
 
 struct WorkspaceTabCloseConfirmation: Equatable {
@@ -104,15 +104,27 @@ struct AgentTab: WorkspaceTabKind {
     }
 
     func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation? {
-        guard model.agents[agentId]?.status == .running else { return nil }
+        guard let agent = model.agents[agentId], agent.parentAgentId == nil, agent.status == .running else { return nil }
         return WorkspaceTabCloseConfirmation(
             title: "Archive running agent?",
             message: "This agent is still running. Archiving it will stop the agent and close the tab.",
             action: "Archive")
     }
 
-    func close(in model: AppModel) async {
-        await model.archive(agentId)
+    /// Closing a subagent's tab only closes the tab, once the daemon knows this client no longer
+    /// shows it. Closing any other agent's tab archives the agent.
+    func close(in model: AppModel, closeTab: () -> Void) async {
+        guard model.agents[agentId]?.parentAgentId != nil else {
+            closeTab()
+            await model.archive(agentId)
+            return
+        }
+        do {
+            try await model.setOpenTab(false, for: agentId)
+            closeTab()
+        } catch {
+            model.lastError = error.localizedDescription
+        }
     }
 }
 
@@ -150,7 +162,8 @@ struct TerminalTab: WorkspaceTabKind {
             action: "Close")
     }
 
-    func close(in model: AppModel) async {
+    func close(in model: AppModel, closeTab: () -> Void) async {
+        closeTab()
         guard let terminal = model.terminals.byWorkspace[workspaceId]?.first(where: { $0.id == terminalId }) else { return }
         await model.terminals.kill(terminal)
     }

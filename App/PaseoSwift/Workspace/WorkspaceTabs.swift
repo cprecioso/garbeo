@@ -5,7 +5,7 @@ import PaseoKit
 
 /// Tabs and splits of one workspace: a Bonsplit controller plus what each of its tabs shows.
 ///
-/// Every agent and terminal of the workspace (its "members") gets a tab; members that show up
+/// Every member of the workspace (`AppModel.tabMembers(of:)`) gets a tab; members that show up
 /// later are added in the background, without taking focus. Closing a tab archives its agent or
 /// kills its terminal (see `closeRequest`).
 ///
@@ -40,7 +40,7 @@ final class WorkspaceTabs {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     /// - Parameters:
-    ///   - members: the workspace's agents and terminals in tab order.
+    ///   - members: what gets a tab automatically, in tab order.
     ///   - saved: a previously saved layout. Tabs whose target is gone are dropped; members missing
     ///     from it get a tab once it's rebuilt.
     init(workspaceId: String, members: [WorkspaceTabContent], saved: WorkspaceLayout?,
@@ -292,9 +292,12 @@ final class WorkspaceTabsRegistry {
 }
 
 extension AppModel {
-    /// What gets a tab in `workspace`: its agents, most recent first, then its terminals.
+    /// What gets a tab in `workspace` automatically: its agents except subagents working alongside
+    /// their parent (most recent first), then its terminals. Those subagents open from the Open Tab
+    /// menu.
     func tabMembers(of workspace: Workspace) -> [WorkspaceTabContent] {
-        agents(in: workspace).map { .agent(AgentTab(agentId: $0.id)) } + terminals.terminals(in: workspace).map(workspace.tab(for:))
+        agents(in: workspace).filter(isWorkspaceRoot).map { .agent(AgentTab(agentId: $0.id)) }
+            + terminals.terminals(in: workspace).map(workspace.tab(for:))
     }
 }
 #endif

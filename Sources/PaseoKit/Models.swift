@@ -98,6 +98,10 @@ public struct Agent: Decodable, Sendable, Identifiable, Hashable {
     /// Label upstream sets on subagents, holding the parent agent's ID (agent-labels.ts).
     public static let parentAgentIdLabel = "paseo.parent-agent-id"
 
+    /// Label a client sets to "true" while it shows this subagent in a tab (agent-labels.ts). The
+    /// daemon keeps such subagents when their parent is archived.
+    public static func openTabLabel(clientId: String) -> String { "paseo.open-agent-tab.\(clientId)" }
+
     enum CodingKeys: String, CodingKey {
         case id, provider, cwd, workspaceId, model, thinkingOptionId, createdAt, updatedAt
         case lastUserMessageAt, title, currentModeId, availableModes, pendingPermissions

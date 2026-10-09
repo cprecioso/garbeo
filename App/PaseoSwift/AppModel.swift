@@ -146,6 +146,16 @@ final class AppModel {
             .sorted { ($0.updatedDate ?? .distantPast) > ($1.updatedDate ?? .distantPast) }
     }
 
+    /// Whether `agent` gets a tab in its workspace automatically: top-level agents, and subagents
+    /// whose parent works in another workspace (upstream's workspace-root policy).
+    func isWorkspaceRoot(_ agent: Agent) -> Bool {
+        guard let parentId = agent.parentAgentId else { return true }
+        guard let workspaceId = workspace(for: agent)?.id,
+              let parentWorkspaceId = agents[parentId].flatMap(workspace(for:))?.id
+        else { return false }
+        return workspaceId != parentWorkspaceId
+    }
+
     func pendingPermissions(for agentId: String) -> [PermissionRequest] {
         permissions[agentId] ?? []
     }
@@ -432,6 +442,15 @@ final class AppModel {
         #else
         selection = nil
         #endif
+    }
+
+    /// This client's open-tab label, see `Agent.openTabLabel(clientId:)`.
+    var openTabLabel: String { Agent.openTabLabel(clientId: clientId) }
+
+    /// Tells the daemon whether this client shows subagent `agentId` in a tab.
+    func setOpenTab(_ open: Bool, for agentId: String) async throws {
+        guard let client else { throw PaseoError.disconnected }
+        try await client.updateAgent(agentId: agentId, labels: [openTabLabel: open ? "true" : "false"])
     }
 
     func setMode(_ modeId: String, for agentId: String) async {

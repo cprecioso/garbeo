@@ -444,6 +444,16 @@ extension DaemonClient {
         _ = try await requestData(["type": "archive_agent_request", "agentId": .string(agentId)])
     }
 
+    /// Sets the given labels on an agent; labels not listed are left as they are.
+    public func updateAgent(agentId: String, labels: [String: String]) async throws {
+        let response = try await request([
+            "type": "update_agent_request",
+            "agentId": .string(agentId),
+            "labels": .object(labels.mapValues(JSONValue.string)),
+        ], as: SendMessageResponse.self)
+        if !response.accepted { throw PaseoError.rpc(response.error ?? "Agent update was not accepted") }
+    }
+
     public func setMode(agentId: String, modeId: String) async throws {
         _ = try await requestData([
             "type": "set_agent_mode_request", "agentId": .string(agentId), "modeId": .string(modeId),
