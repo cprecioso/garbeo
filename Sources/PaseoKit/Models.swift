@@ -93,12 +93,25 @@ public struct Agent: Decodable, Sendable, Identifiable, Hashable {
     public var archivedAt: String?
     public var lastUsage: AgentUsage?
     public var activeTurn: ActiveTurn?
+    private var wireLabels: WireLabels?
+
+    /// Label upstream sets on subagents, holding the parent agent's ID (agent-labels.ts).
+    public static let parentAgentIdLabel = "paseo.parent-agent-id"
 
     enum CodingKeys: String, CodingKey {
         case id, provider, cwd, workspaceId, model, thinkingOptionId, createdAt, updatedAt
         case lastUserMessageAt, title, currentModeId, availableModes, pendingPermissions
         case requiresAttention, attentionReason, archivedAt, lastUsage, activeTurn
         case statusRaw = "status"
+        case wireLabels = "labels"
+    }
+
+    /// String labels from the wire; missing or malformed labels decode as empty.
+    public var labels: [String: String] { wireLabels?.values ?? [:] }
+    /// Set when this agent is a subagent (trimmed; blank means no parent).
+    public var parentAgentId: String? {
+        let parent = labels[Self.parentAgentIdLabel]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return parent?.isEmpty == false ? parent : nil
     }
 
     public var status: AgentStatus { AgentStatus(raw: statusRaw) }
@@ -109,6 +122,16 @@ public struct Agent: Decodable, Sendable, Identifiable, Hashable {
     public var updatedDate: Date? { PaseoDate.parse(updatedAt) }
     public var createdDate: Date? { PaseoDate.parse(createdAt) }
     public var currentMode: AgentMode? { availableModes?.first { $0.id == currentModeId } }
+}
+
+/// Decodes a `Record<string, string>` without ever throwing; non-string values are dropped.
+private struct WireLabels: Decodable, Sendable, Hashable {
+    var values: [String: String]
+
+    init(from decoder: Decoder) throws {
+        let raw = (try? decoder.singleValueContainer().decode([String: JSONValue].self)) ?? [:]
+        values = raw.compactMapValues { if case .string(let value) = $0 { value } else { nil } }
+    }
 }
 
 public struct DiffStat: Decodable, Sendable, Hashable {
