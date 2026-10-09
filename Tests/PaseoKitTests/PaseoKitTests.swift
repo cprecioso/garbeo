@@ -64,6 +64,31 @@ private func page(_ entries: String, endSeq: Int, epoch: String = "e1") throws -
         #expect(item == .unknown(type: "plugin"))
     }
 
+    @Test func derivesParentAgentIdFromLabels() throws {
+        func agent(labels: String?) throws -> Agent {
+            let field = labels.map { #","labels":\#($0)"# } ?? ""
+            return try JSONDecoder().decode(Agent.self, from: Data(#"{"id":"a","provider":"x","cwd":"/","status":"idle"\#(field)}"#.utf8))
+        }
+        let topLevel = try agent(labels: nil)
+        #expect(topLevel.labels.isEmpty)
+        #expect(topLevel.parentAgentId == nil)
+
+        let child = try agent(labels: #"{"paseo.parent-agent-id":" parent-1 ","team":"core"}"#)
+        #expect(child.parentAgentId == "parent-1")
+        #expect(child.labels == ["paseo.parent-agent-id": " parent-1 ", "team": "core"])
+
+        #expect(try agent(labels: #"{"paseo.parent-agent-id":"   "}"#).parentAgentId == nil)
+        #expect(try agent(labels: #"{"paseo.parent-agent-id":""}"#).parentAgentId == nil)
+
+        let mixed = try agent(labels: #"{"paseo.parent-agent-id":42,"flag":true,"team":"core"}"#)
+        #expect(mixed.parentAgentId == nil)
+        #expect(mixed.labels == ["team": "core"])
+
+        #expect(try agent(labels: "null").labels.isEmpty)
+        #expect(try agent(labels: #"["paseo.parent-agent-id"]"#).labels.isEmpty)
+        #expect(Agent.parentAgentIdLabel == "paseo.parent-agent-id")
+    }
+
     @Test func decodesToolCallDetail() throws {
         let item = try JSONDecoder().decode(TimelineItem.self, from: Data("""
         {"type":"tool_call","callId":"t1","name":"Bash","status":"completed","error":null,
