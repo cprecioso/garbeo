@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "bump-minor-pre-major": true,
+  "bootstrap-sha": "728e7b2da961f691612858c49a17e85f211b3b14",
+  "packages": {
+    ".": {
+      "extra-files": ["App/PaseoSwift.xcodeproj/project.xcproj"]
+    }
+  }
+}
