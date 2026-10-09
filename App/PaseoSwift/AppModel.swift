@@ -372,20 +372,12 @@ final class AppModel {
 
     // MARK: Persistence
 
-    // The URL lives in UserDefaults; the password goes to the Keychain.
+    // Saved hosts live in UserDefaults; passwords and relay keys go to the Keychain.
     private static func loadEndpoint() -> DaemonEndpoint? {
-        guard let url = UserDefaults.standard.string(forKey: "endpointURL") else { return nil }
-        return DaemonEndpoint(url: url, password: Keychain.password(for: url))
+        HostStore.shared.currentEndpoint
     }
 
     private static func saveEndpoint(_ endpoint: DaemonEndpoint?) {
-        let previous = UserDefaults.standard.string(forKey: "endpointURL")
-        if let previous, previous != endpoint?.url { Keychain.setPassword(nil, for: previous) }
-        if let endpoint {
-            UserDefaults.standard.set(endpoint.url, forKey: "endpointURL")
-            Keychain.setPassword(endpoint.password, for: endpoint.url)
-        } else {
-            UserDefaults.standard.removeObject(forKey: "endpointURL")
-        }
+        HostStore.shared.setCurrent(endpoint)
     }
 }

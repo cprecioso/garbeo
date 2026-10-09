@@ -30,6 +30,7 @@ struct SidebarView: View {
             }
         }
         .searchable(text: $search, placement: .sidebar, prompt: "Filter agents")
+        .safeAreaInset(edge: .bottom, spacing: 0) { ConnectionFooter() }
         .navigationTitle(model.serverInfo?.hostname ?? "Paseo")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

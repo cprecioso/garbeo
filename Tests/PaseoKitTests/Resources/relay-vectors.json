@@ -1,0 +1,119 @@
+{
+  "source": "getpaseo/paseo packages/relay + packages/protocol (tweetnacl 1.0.3)",
+  "daemonSecretKeyHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+  "daemonPublicKeyB64": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9/AsrhtHHw=",
+  "clientSecretKeyHex": "4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60",
+  "clientPublicKeyB64": "ZLEBsdC+WocEvQePmJUAH8A+jp+VIvGI3RKNmEbUhGY=",
+  "sharedKeyHex": "f8d48c0771b2fab0580110626883f7671e7d0001a6823f3ad9e93d8ef177e8fc",
+  "boxes": [
+    {
+      "kind": "text",
+      "text": "",
+      "nonceHex": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+      "bundleHex": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b751fb4e2197de31473ad224fd9d936822"
+    },
+    {
+      "kind": "text",
+      "text": "hello",
+      "nonceHex": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8",
+      "bundleHex": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8a1eb2aec87130c8c8f9b20130df3c7ae4506cd9471"
+    },
+    {
+      "kind": "text",
+      "text": "{\"type\":\"session\",\"message\":{\"type\":\"ping\",\"note\":\"héllo ✓ 🚀\"}}",
+      "nonceHex": "a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9",
+      "bundleHex": "a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9cf203b4b9cdd8971beb532dfe49ed41af5ac805d4abee8a3bac569d507b247301a2b92bab18abd0d0637619a13c6d4e763bd5399b88b27970153327f926b8eb52e902fff063ab6fc1fa36d714025ae4dd1e9d0f911"
+    },
+    {
+      "kind": "binary",
+      "hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "nonceHex": "a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9ba",
+      "bundleHex": "a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9baf80ce348aeab1ecf78d997fd029f40fabe39c706855f9b7f3a25697fa8c4e9e33c108b7beba3225f6b047aec3efe34d48c268d7d96507213f3f8b3ede95ff2a4d207034c311878df339ceec12e04a1497236cef8f48758d035edb9560952d04a85615422ae8fe55c9883fc3095158ed144fc474328f6614ca87a1ac991dc210af3e375b94705cde558ec9346654ba1e0c174709e07c2e99895a5ab7ea2fee0d01dc61aaf0a6a9fb26e511fb9cf372e9b4721a5f866c7d2e338bff111c5ab2b47ca5d246ff777a30e0de083df394cb06274eb88593df753aff628e4be9b6cf3875727c7d1240bdb69edc2b2e40eb44112726357a3d3c2f0295b2c4eeaea4e316a89bdcde21d480532f783eec7278cde9d"
+    }
+  ],
+  "channelBinaryCapable": {
+    "hello": "{\"type\":\"e2ee_hello\",\"key\":\"ZLEBsdC+WocEvQePmJUAH8A+jp+VIvGI3RKNmEbUhGY=\",\"capabilities\":{\"binaryCiphertext\":true}}",
+    "frames": [
+      {
+        "text": "{\"type\":\"e2ee_ready\",\"capabilities\":{\"binaryCiphertext\":true}}"
+      },
+      {
+        "text": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYn0Jca/CSY8TsjXZsqD8b1RE3sf9IlmrDXAB36DXXluRJyYcHaFujdvIndfDDId9u5z/BaXnv1micbxwET/GGLhcSoReR32Hkm3rPU0RmOjm99BP2oG4TNhQ=="
+      },
+      {
+        "binaryHex": "303132333435363738393a3b3c3d3e3f40414243444546472e89664dae160818b6992b47fa02d06d4bcc151ac7cacbb538e32f42e44087415c530dd242cb975036dd07d6695b212bd05afa649a0c43a6"
+      }
+    ],
+    "plaintexts": [
+      {
+        "kind": "text",
+        "text": "{\"type\":\"session\",\"message\":{\"type\":\"status\",\"payload\":{\"status\":\"ok\"}}}"
+      },
+      {
+        "kind": "binary",
+        "hex": "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f1011121314151617"
+      }
+    ]
+  },
+  "channelLegacy": {
+    "hello": "{\"type\":\"e2ee_hello\",\"key\":\"ZLEBsdC+WocEvQePmJUAH8A+jp+VIvGI3RKNmEbUhGY=\"}",
+    "frames": [
+      {
+        "text": "{\"type\":\"e2ee_ready\"}"
+      },
+      {
+        "text": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYn0Jca/CSY8TsjXZsqD8b1RE3sf9IlmrDXAB36DXXluRJyYcHaFujdvIndfDDId9u5z/BaXnv1micbxwET/GGLhcSoReR32Hkm3rPU0RmOjm99BP2oG4TNhQ=="
+      },
+      {
+        "text": "MDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHLolmTa4WCBi2mStH+gLQbUvMFRrHysu1OOMvQuRAh0FcUw3SQsuXUDbdB9ZpWyEr0Fr6ZJoMQ6Y="
+      }
+    ],
+    "plaintexts": [
+      {
+        "kind": "text",
+        "text": "{\"type\":\"session\",\"message\":{\"type\":\"status\",\"payload\":{\"status\":\"ok\"}}}"
+      },
+      {
+        "kind": "binary",
+        "hex": "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f1011121314151617"
+      }
+    ]
+  },
+  "offer": {
+    "v": 2,
+    "serverId": "srv_test_123",
+    "daemonPublicKeyB64": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9/AsrhtHHw=",
+    "relay": {
+      "endpoint": "relay.paseo.sh:443",
+      "useTls": true
+    }
+  },
+  "offerUrl": "https://app.paseo.sh/#offer=eyJ2IjoyLCJzZXJ2ZXJJZCI6InNydl90ZXN0XzEyMyIsImRhZW1vblB1YmxpY0tleUI2NCI6IkI2Tjh2QlFnazhpM1Zkd2JFT2hzdENZM1N0RnFxRlB0QzkvQXNyaHRISHc9IiwicmVsYXkiOnsiZW5kcG9pbnQiOiJyZWxheS5wYXNlby5zaDo0NDMiLCJ1c2VUbHMiOnRydWV9fQ",
+  "relayUri": "relay://relay.paseo.sh:443/srv_test_123?key=B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9%2FAsrhtHHw%3D&ssl=true&password=p%40ss+word",
+  "relayUriParsed": {
+    "offer": {
+      "v": 2,
+      "serverId": "srv_test_123",
+      "daemonPublicKeyB64": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9/AsrhtHHw=",
+      "relay": {
+        "endpoint": "relay.paseo.sh:443",
+        "useTls": true
+      }
+    },
+    "password": "p@ss word"
+  },
+  "relayWebSocketUrls": [
+    {
+      "endpoint": "relay.paseo.sh:443",
+      "useTls": true,
+      "serverId": "srv_test_123",
+      "url": "wss://relay.paseo.sh/ws?serverId=srv_test_123&role=client&v=2"
+    },
+    {
+      "endpoint": "[::1]:8080",
+      "useTls": false,
+      "serverId": "srv/with space",
+      "url": "ws://[::1]:8080/ws?serverId=srv%2Fwith+space&role=client&v=2"
+    }
+  ]
+}

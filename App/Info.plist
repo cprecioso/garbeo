@@ -9,6 +9,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Paseo uses the camera to scan the pairing QR code shown by your Paseo daemon.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Paseo connects to the Paseo daemon running on your network.</string>
 </dict>

@@ -12,6 +12,13 @@ struct PaseoSwiftApp: App {
                 .task {
                     #if DEBUG
                     DebugSnapshot.scheduleIfRequested(model: model)
+                    // Development aid: `-PaseoPairingLink <url>` pairs and connects on launch.
+                    if let link = UserDefaults.standard.string(forKey: "PaseoPairingLink"),
+                       let endpoint = try? DaemonEndpoint.fromPairingLink(link)
+                    {
+                        await model.connect(to: endpoint)
+                        return
+                    }
                     #endif
                     if let endpoint = model.endpoint, model.connection == .idle {
                         await model.connect(to: endpoint)
@@ -42,11 +49,14 @@ struct RootView: View {
             case .idle, .failed:
                 ConnectView()
             case .connecting:
-                ProgressView("Connecting to \(model.endpoint?.url ?? "daemon")…")
+                ProgressView("Connecting to \(model.endpoint?.displayAddress ?? "daemon")…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .connected, .reconnecting:
                 MainView()
             }
+        }
+        .onChange(of: model.serverInfo?.hostname) { _, hostname in
+            HostStore.shared.updateCurrentName(hostname)
         }
         .alert("Something went wrong", isPresented: Binding(
             get: { model.lastError != nil }, set: { if !$0 { model.lastError = nil } }
