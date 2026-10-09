@@ -186,12 +186,15 @@ private struct AgentMoreMenu: View {
 private struct TimelineView: View {
     @Environment(AppModel.self) private var model
     let agent: Agent
+    /// Expanded reasoning and tool rows. Kept here rather than in the rows, since the lazy stack
+    /// may discard an off-screen row's state.
+    @State private var expanded: Set<String> = []
 
     var body: some View {
         let live = model.timelines[agent.id]
         let timeline = live?.timeline ?? AgentTimeline()
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 14) {
                 if timeline.hasOlder {
                     Button {
                         Task { await model.loadOlder(agent.id) }
@@ -217,7 +220,7 @@ private struct TimelineView: View {
                     Text("No messages yet.").foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
                 }
                 ForEach(timeline.rows) { row in
-                    TimelineRowView(row: row)
+                    TimelineRowView(row: row, isExpanded: isExpanded(row.id))
                 }
                 if agent.status == .running {
                     WorkingIndicator(since: agent.activeTurn?.startedAt)
@@ -232,6 +235,15 @@ private struct TimelineView: View {
         .defaultScrollAnchor(.bottom, for: .initialOffset)
         .defaultScrollAnchor(.bottom, for: .sizeChanges)
         .id(timeline.isLoaded)
+        .onChange(of: agent.id) { expanded = [] }
+    }
+
+    private func isExpanded(_ id: String) -> Binding<Bool> {
+        Binding {
+            expanded.contains(id)
+        } set: {
+            if $0 { expanded.insert(id) } else { expanded.remove(id) }
+        }
     }
 }
 
@@ -254,6 +266,7 @@ private struct WorkingIndicator: View {
 
 struct TimelineRowView: View {
     let row: TimelineRow
+    @Binding var isExpanded: Bool
 
     var body: some View {
         switch row.kind {
@@ -270,11 +283,11 @@ struct TimelineRowView: View {
         case .assistant(let text, _):
             MarkdownText(text)
         case .reasoning(let text):
-            CollapsibleRow(icon: "brain", title: "Thinking", subtitle: nil, tint: .secondary) {
+            CollapsibleRow(icon: "brain", title: "Thinking", subtitle: nil, tint: .secondary, isExpanded: $isExpanded) {
                 Text(text).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
             }
         case .tool(let call):
-            ToolCallRow(call: call)
+            ToolCallRow(call: call, isExpanded: $isExpanded)
         case .todo(let items):
             VStack(alignment: .leading, spacing: 4) {
                 Label("Tasks", systemImage: "checklist").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
@@ -309,9 +322,10 @@ struct TimelineRowView: View {
 
 private struct ToolCallRow: View {
     let call: ToolCall
+    @Binding var isExpanded: Bool
 
     var body: some View {
-        CollapsibleRow(icon: icon, title: call.name, subtitle: call.detail.summary, tint: tint, trailing: statusView) {
+        CollapsibleRow(icon: icon, title: call.name, subtitle: call.detail.summary, tint: tint, trailing: statusView, isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: 6) {
                 if let body = call.detail.body, !body.isEmpty {
                     CodeBlock(text: String(body.prefix(20_000)), isDiff: call.detail.type == "edit")
@@ -364,17 +378,18 @@ private struct CollapsibleRow<Content: View, Trailing: View>: View {
     let subtitle: String?
     let tint: Color
     var trailing: Trailing
+    @Binding var isExpanded: Bool
     @ViewBuilder var content: () -> Content
-    @State private var isExpanded = false
 
     init(icon: String, title: String, subtitle: String?, tint: Color, trailing: Trailing = EmptyView(),
-         @ViewBuilder content: @escaping () -> Content)
+         isExpanded: Binding<Bool>, @ViewBuilder content: @escaping () -> Content)
     {
         self.icon = icon
         self.title = title
         self.subtitle = subtitle
         self.tint = tint
         self.trailing = trailing
+        _isExpanded = isExpanded
         self.content = content
     }
 
