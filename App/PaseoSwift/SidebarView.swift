@@ -7,8 +7,7 @@ struct SidebarView: View {
     @State private var search = ""
 
     var body: some View {
-        @Bindable var model = model
-        List(selection: $model.selection) {
+        List(selection: selection) {
             ConnectionBanner()
             PluginSidebarSection()
 
@@ -17,9 +16,15 @@ struct SidebarView: View {
                 if !workspaces.isEmpty {
                     Section(project.name) {
                         ForEach(workspaces) { workspace in
+                            #if os(macOS)
+                            // A workspace's agents and terminals are its tabs, not sidebar rows.
+                            WorkspaceLabel(workspace: workspace, showsStatus: true)
+                                .tag(SidebarSelection.workspace(workspace.id))
+                            #else
                             WorkspaceSection(
                                 workspace: workspace, agents: model.agents(in: workspace).filter(matches),
                                 terminals: model.terminals.terminals(in: workspace).filter(matches))
+                            #endif
                         }
                     }
                 }
@@ -32,7 +37,7 @@ struct SidebarView: View {
                 }
             }
         }
-        .searchable(text: $search, placement: .sidebar, prompt: "Filter agents")
+        .searchable(text: $search, placement: .sidebar, prompt: searchPrompt)
         .safeAreaInset(edge: .bottom, spacing: 0) { ConnectionFooter() }
         .navigationTitle(model.serverInfo?.hostname ?? "Paseo")
         .toolbar {
@@ -59,10 +64,32 @@ struct SidebarView: View {
         .refreshable { model.retryNow() }
     }
 
+    /// On macOS an agent or terminal selection is a tab of its workspace, so the workspace row
+    /// stays highlighted.
+    private var selection: Binding<SidebarSelection?> {
+        @Bindable var model = model
+        #if os(macOS)
+        return Binding(
+            get: { model.selectedWorkspace.map { .workspace($0.id) } ?? model.selection },
+            set: { model.selection = $0 })
+        #else
+        return $model.selection
+        #endif
+    }
+
+    private var searchPrompt: String {
+        #if os(macOS)
+        "Filter workspaces"
+        #else
+        "Filter agents"
+        #endif
+    }
+
     private func matches(_ workspace: Workspace) -> Bool {
         guard !search.isEmpty else { return true }
         return workspace.displayName.localizedCaseInsensitiveContains(search)
             || model.agents(in: workspace).contains(where: matches)
+            || model.terminals.terminals(in: workspace).contains(where: matches)
     }
 
     private func matches(_ agent: Agent) -> Bool {
@@ -108,27 +135,59 @@ private struct WorkspaceSection: View {
             ForEach(agents) { AgentRow(agent: $0).tag(SidebarSelection.agent($0.id)) }
             ForEach(terminals) { TerminalRow(terminal: $0).tag(SidebarSelection.terminal($0.id)) }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: workspace.workspaceKind == "worktree" ? "arrow.triangle.branch" : "folder")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16)
-                Text(workspace.displayName).lineLimit(1)
-                Spacer(minLength: 4)
-                if let diff = workspace.diffStat, diff.additions + diff.deletions > 0 {
-                    DiffStatView(diff: diff)
-                }
-            }
-            .contextMenu {
-                Button("New Terminal", systemImage: "apple.terminal") {
-                    Task { await model.terminals.create(in: workspace) }
-                }
-                PluginWorkspaceMenuItems(workspaceId: workspace.id)
+            WorkspaceLabel(workspace: workspace)
+        }
+    }
+}
+
+private struct WorkspaceLabel: View {
+    @Environment(AppModel.self) private var model
+    let workspace: Workspace
+    /// Summarizes the workspace's agents, for when they aren't listed below it.
+    var showsStatus = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: workspace.workspaceKind == "worktree" ? "arrow.triangle.branch" : "folder")
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            Text(workspace.displayName).lineLimit(1)
+            Spacer(minLength: 4)
+            if showsStatus { WorkspaceStatusIndicator(agents: model.agents(in: workspace)) }
+            if let diff = workspace.diffStat, diff.additions + diff.deletions > 0 {
+                DiffStatView(diff: diff)
             }
         }
-        #if os(macOS)
-        // On macOS a workspace opens as tabs and split panes.
-        .tag(SidebarSelection.workspace(workspace.id))
-        #endif
+        .contextMenu {
+            Button("New Terminal", systemImage: "apple.terminal") {
+                Task { await model.terminals.create(in: workspace) }
+            }
+            PluginWorkspaceMenuItems(workspaceId: workspace.id)
+        }
+    }
+}
+
+/// The most pressing state among a workspace's agents: waiting for permission, running, failed,
+/// or needing attention. Nothing when all are idle.
+private struct WorkspaceStatusIndicator: View {
+    @Environment(AppModel.self) private var model
+    let agents: [Agent]
+
+    var body: some View {
+        let waiting = agents.count(where: { !model.pendingPermissions(for: $0.id).isEmpty })
+        let running = agents.count(where: { $0.status == .running || $0.status == .initializing })
+        let failed = agents.count(where: { $0.status == .error })
+        let attention = agents.count(where: { $0.requiresAttention == true })
+        if waiting > 0 {
+            Image(systemName: "hand.raised.fill").foregroundStyle(.orange).font(.caption)
+                .help("Waiting for permission (\(waiting))")
+        } else if running > 0 {
+            ProgressView().controlSize(.mini).help("Running (\(running))")
+        } else if failed > 0 {
+            Circle().fill(.red).frame(width: 8, height: 8).help("Error (\(failed))")
+        } else if attention > 0 {
+            Circle().fill(Color.accentColor).frame(width: 8, height: 8).help("Needs attention (\(attention))")
+        }
     }
 }
 

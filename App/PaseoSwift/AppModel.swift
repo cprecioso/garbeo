@@ -12,9 +12,9 @@ enum ConnectionState: Equatable {
     var isConnected: Bool { if case .connected = self { true } else { false } }
 }
 
-/// What the sidebar has selected. iOS selects agents and terminals; macOS can also select a
-/// workspace, which opens its tabbed workspace view (selecting an agent or terminal there focuses
-/// its tab).
+/// What the sidebar has selected. iOS selects agents and terminals. The macOS sidebar lists only
+/// workspaces, which open as tabs; there an agent or terminal selection is the focused tab (or a
+/// tab to focus), and the sidebar highlights its workspace.
 enum SidebarSelection: Hashable {
     case agent(String)
     case workspace(String)
@@ -144,6 +144,16 @@ final class AppModel {
                     && !directories.contains(agent.cwd)
             }
             .sorted { ($0.updatedDate ?? .distantPast) > ($1.updatedDate ?? .distantPast) }
+    }
+
+    /// Whether `agent` gets a tab in its workspace automatically: top-level agents, and subagents
+    /// whose parent works in another workspace (upstream's workspace-root policy).
+    func isWorkspaceRoot(_ agent: Agent) -> Bool {
+        guard let parentId = agent.parentAgentId else { return true }
+        guard let workspaceId = workspace(for: agent)?.id,
+              let parentWorkspaceId = agents[parentId].flatMap(workspace(for:))?.id
+        else { return false }
+        return workspaceId != parentWorkspaceId
     }
 
     func pendingPermissions(for agentId: String) -> [PermissionRequest] {
@@ -432,6 +442,15 @@ final class AppModel {
         #else
         selection = nil
         #endif
+    }
+
+    /// This client's open-tab label, see `Agent.openTabLabel(clientId:)`.
+    var openTabLabel: String { Agent.openTabLabel(clientId: clientId) }
+
+    /// Tells the daemon whether this client shows subagent `agentId` in a tab.
+    func setOpenTab(_ open: Bool, for agentId: String) async throws {
+        guard let client else { throw PaseoError.disconnected }
+        try await client.updateAgent(agentId: agentId, labels: [openTabLabel: open ? "true" : "false"])
     }
 
     func setMode(_ modeId: String, for agentId: String) async {
