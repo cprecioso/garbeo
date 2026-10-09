@@ -1,5 +1,5 @@
 {
-  "originHash" : "d7ac9ee5fb74f20f882426bd41a1d240d51d619039e2a5c75aa96edc972597bf",
+  "originHash" : "b6a77a88d22f0bdb4a49c94459c8b25e338516e6a6661d2d3c66baabf9c7d0c1",
   "pins" : [
     {
       "identity" : "bonsplit",
@@ -29,6 +29,15 @@
       }
     },
     {
+      "identity" : "swift-concurrency-extras",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pointfreeco/swift-concurrency-extras",
+      "state" : {
+        "revision" : "5fa253428866f2360c3754e88537f700ed2656b5",
+        "version" : "1.4.1"
+      }
+    },
+    {
       "identity" : "swift-png",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tayloraswift/swift-png",
@@ -53,6 +62,24 @@
       "state" : {
         "revision" : "2dad6a1e516f755bed77cf9bbd09455062f54758",
         "version" : "1.99.0"
+      }
+    },
+    {
+      "identity" : "swiftui-math",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/gonzalezreal/swiftui-math",
+      "state" : {
+        "revision" : "0b5c2cfaaec8d6193db206f675048eeb5ce95f71",
+        "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "textual",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/gonzalezreal/textual",
+      "state" : {
+        "revision" : "01b51875a5406eefc95f52a058cb059e7bc94dc4",
+        "version" : "0.5.0"
       }
     }
   ],
