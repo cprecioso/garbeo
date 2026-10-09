@@ -1,9 +1,9 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.4
 import PackageDescription
 
 let package = Package(
     name: "PaseoKit",
-    platforms: [.macOS(.v15), .iOS(.v18)],
+    platforms: [.macOS(.v27), .iOS(.v27)],
     products: [
         .library(name: "PaseoKit", targets: ["PaseoKit"]),
         .library(name: "PaseoTerminal", targets: ["PaseoTerminal"]),

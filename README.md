@@ -66,7 +66,7 @@ xcodebuild -project App/PaseoSwift.xcodeproj -scheme PaseoSwift -destination 'pl
 
 SwiftTerm (pinned to 1.99.0, the 2.0 preview) runs a build-tool plugin that generates its build info and terminfo tables. Xcode asks you to "Trust & Enable" it on first build; on the command line pass `-skipPackagePluginValidation`.
 
-Requires Xcode 16+ (tested with Xcode 27), macOS 15 / iOS 18.
+Requires Xcode 27+, macOS 27 / iOS 27.
 
 ## Tests
 
