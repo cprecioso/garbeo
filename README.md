@@ -35,6 +35,7 @@ Sources/PaseoTerminal/   PaseoTerminalView: self-contained SwiftUI terminal (Swi
 Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
   Resources/relay-vectors.json  known-answer vectors generated from the upstream TypeScript
   Fixtures/terminal-vectors.json  terminal codec vectors generated from the upstream TypeScript
+Tests/PaseoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
 App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Bonsplit linked on macOS only)
@@ -54,15 +55,18 @@ To add a tab kind (plugin webview, …), write a struct conforming to `Workspace
 open App/PaseoSwift.xcodeproj        # pick "My Mac" or an iOS Simulator, then Run
 
 # or from the command line
-xcodebuild -project App/PaseoSwift.xcodeproj -scheme PaseoSwift -destination 'platform=macOS' build
+xcodebuild -project App/PaseoSwift.xcodeproj -scheme PaseoSwift -destination 'platform=macOS' \
+  -skipPackagePluginValidation build
 ```
+
+SwiftTerm (pinned to 1.99.0, the 2.0 preview) runs a build-tool plugin that generates its build info and terminfo tables. Xcode asks you to "Trust & Enable" it on first build; on the command line pass `-skipPackagePluginValidation`.
 
 Requires Xcode 16+ (tested with Xcode 27), macOS 15 / iOS 18.
 
 ## Tests
 
 ```sh
-swift test                                      # unit tests
+swift test                                      # unit tests (PaseoKit + PaseoTerminal)
 PASEO_LIVE_URL=127.0.0.1:6767 swift test        # + read-only checks against a running daemon
 PASEO_LIVE_URL=127.0.0.1:6767 PASEO_LIVE_WRITE=1 swift test   # + creates real agents (cheap model)
 ```
@@ -120,6 +124,7 @@ Relay connections (`packages/relay`, `packages/protocol/src/connection-offer.ts`
 - `-PaseoSelectAgent first|<agentId>` opens an agent on launch
 - `-PaseoPairingLink <url>` pairs with a relay pairing link and connects on launch
 - `-PaseoSelectTerminal first|<terminalId>|new` opens a terminal on launch (`new` creates one in the first workspace; throwaway daemons only)
+- `-PaseoTerminalType 'echo hi\r'` types into the opened terminal through the emulator's input path once it's live
 - `-PaseoResizeWindow 900x500` (macOS, with `-PaseoSnapshot`) resizes the window and takes a third snapshot
 - `-PaseoSelectWorkspace first|<workspaceId>` opens a workspace on launch (macOS: tabbed view)
 - `-PaseoTerminalPassive YES` (macOS) terminal tabs never take focus, so attaching never claims the PTY size (for read-only runs against a live daemon)
