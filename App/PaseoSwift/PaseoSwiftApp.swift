@@ -62,6 +62,9 @@ struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var showingNewAgent = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     var body: some View {
         @Bindable var model = model
@@ -69,7 +72,9 @@ struct MainView: View {
             SidebarView(showingNewAgent: $showingNewAgent)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
-            if let agent = model.selectedAgent {
+            if let pane = model.plugins.activePane, !isCompact {
+                PluginPaneDetail(target: pane)
+            } else if let agent = model.selectedAgent {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
@@ -79,6 +84,23 @@ struct MainView: View {
         .sheet(isPresented: $showingNewAgent) {
             NewAgentView()
         }
+        // Compact iPhone layouts show the sidebar alone, so plugin panes open as a sheet there.
+        .sheet(item: Binding(get: { isCompact ? model.plugins.activePane : nil }, set: { model.plugins.activePane = $0 })) { pane in
+            NavigationStack { PluginPaneDetail(target: pane) }
+                .environment(model)
+        }
+        .onChange(of: model.selectedAgentId) { _, agentId in
+            if agentId != nil { model.plugins.activePane = nil }
+        }
+        .background(PluginRegistryHost())
+    }
+
+    private var isCompact: Bool {
+        #if os(iOS)
+        sizeClass == .compact
+        #else
+        false
+        #endif
     }
 }
 

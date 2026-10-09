@@ -25,6 +25,7 @@ struct AgentDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar { AgentToolbar(agent: agent) }
+        .toolbar { PluginAgentToolbar(agent: agent) }
     }
 
     private var subtitle: String {

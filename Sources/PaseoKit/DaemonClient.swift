@@ -33,6 +33,7 @@ public enum DaemonEvent: Sendable {
     case permissionRequested(AgentPermissionRequestPayload)
     case permissionResolved(AgentPermissionResolvedPayload)
     case serverInfo(ServerInfo)
+    case pluginStatus(PluginStatusPayload)
     case disconnected(String?)
 }
 
@@ -258,6 +259,8 @@ public actor DaemonClient {
         case "agent_permission_request": decode(AgentPermissionRequestPayload.self).map(DaemonEvent.permissionRequested)
         case "agent_permission_resolved": decode(AgentPermissionResolvedPayload.self).map(DaemonEvent.permissionResolved)
         case "status" where message.payload?.status == "server_info": decode(ServerInfo.self).map(DaemonEvent.serverInfo)
+        case "status" where message.payload?.status?.hasPrefix("plugin_") == true:
+            decode(PluginStatusPayload.self).map(DaemonEvent.pluginStatus)
         default: nil
         }
         if let event { eventContinuation.yield(event) }

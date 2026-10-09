@@ -33,6 +33,7 @@ final class AppModel {
         didSet { if oldValue != selectedAgentId { Task { await viewAgent(selectedAgentId) } } }
     }
     var lastError: String?
+    let plugins = PluginStore()
 
     var endpoint: DaemonEndpoint? {
         didSet { Self.saveEndpoint(endpoint) }
@@ -53,6 +54,7 @@ final class AppModel {
             defaults.set(clientId, forKey: "clientId")
         }
         endpoint = Self.loadEndpoint()
+        plugins.app = self
     }
 
     // MARK: Derived state
@@ -114,6 +116,7 @@ final class AppModel {
         client = nil
         Task { await old?.disconnect() }
         connection = .idle
+        plugins.detach(keepPane: false)
         workspaces = [:]
         agents = [:]
         permissions = [:]
@@ -148,6 +151,7 @@ final class AppModel {
             try await bootstrap(client)
             guard myGeneration == generation else { return }
             connection = .connected(info)
+            plugins.attach(client: client, info: info)
         } catch {
             guard myGeneration == generation else { return }
             await client.disconnect()
@@ -172,9 +176,10 @@ final class AppModel {
         permissions = Dictionary(agentList.compactMap { agent in
             agent.pendingPermissions.flatMap { $0.isEmpty ? nil : (agent.id, $0) }
         }, uniquingKeysWith: { _, last in last })
+        let pluginEvents = await client.serverInfo?.supportsPlugins == true ? PluginEvents.subscription : []
         try await client.subscribeToSessionEvents([
             "agent_permission_request", "agent_permission_resolved", "agent_attention_required",
-        ])
+        ] + pluginEvents)
         if let selectedAgentId, agents[selectedAgentId] != nil {
             await viewAgent(selectedAgentId)
         } else if selectedAgentId != nil {
@@ -231,8 +236,11 @@ final class AppModel {
             permissions[payload.agentId]?.removeAll { $0.id == payload.requestId }
         case .serverInfo(let info):
             if connection.isConnected { connection = .connected(info) }
+        case .pluginStatus(let status):
+            plugins.handle(status)
         case .disconnected(let reason):
             client = nil
+            plugins.detach(keepPane: true)
             scheduleReconnect(attempt: 1, error: reason)
         case .agentUpdate(.unknown), .workspaceUpdate(.unknown):
             break

@@ -10,6 +10,7 @@ struct SidebarView: View {
         @Bindable var model = model
         List(selection: $model.selectedAgentId) {
             ConnectionBanner()
+            PluginSidebarSection()
 
             ForEach(model.projects) { project in
                 let workspaces = project.workspaces.filter { matches($0) }
@@ -107,6 +108,7 @@ private struct WorkspaceSection: View {
                     DiffStatView(diff: diff)
                 }
             }
+            .contextMenu { PluginWorkspaceMenuItems(workspaceId: workspace.id) }
         }
     }
 }

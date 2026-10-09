@@ -1,0 +1,24 @@
+{
+  "name": "paseo-swift-plugin-host",
+  "private": true,
+  "description": "JS runtime that runs Paseo plugin client bundles inside the app's WKWebView panes",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.11",
+    "lucide-react": "^1.40.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native-web": "~0.21.0",
+    "use-sync-external-store": "^1.6.0",
+    "zod": "^4.4.3",
+    "semver": "^7.7.0",
+    "base64-js": "^1.5.1",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
