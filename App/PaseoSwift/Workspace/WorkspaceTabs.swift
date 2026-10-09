@@ -5,6 +5,10 @@ import PaseoKit
 
 /// Tabs and splits of one workspace: a Bonsplit controller plus what each of its tabs shows.
 ///
+/// Every agent and terminal of the workspace (its "members") gets a tab; members that show up
+/// later are added in the background, without taking focus. Closing a tab archives its agent or
+/// kills its terminal (see `closeRequest`).
+///
 /// Bonsplit owns the tree (panes, tab order, selection, drag and drop). Not every change goes
 /// through its delegate (drag-to-split, in-bar selection), so the saved layout is derived from
 /// `treeSnapshot()` whenever the observable controller changes rather than from callbacks.
@@ -15,13 +19,18 @@ final class WorkspaceTabs {
     let workspaceId: String
     let controller = BonsplitController(configuration: BonsplitConfiguration(allowCloseLastPane: false))
     private(set) var contents: [TabID: WorkspaceTabContent] = [:]
+    /// A tab the user asked to close. `WorkspaceView` confirms if needed, then calls `close(_:)`.
+    var closeRequest: WorkspaceTabContent?
     /// False while a saved layout is rebuilt; layout changes aren't saved meanwhile.
     private(set) var isReady = false
 
     @ObservationIgnored private var tabsByUUID: [String: TabID] = [:]
-    /// Agents that already had a chance to get a tab; any other agent showing up in the workspace
-    /// was just created and is opened automatically.
-    @ObservationIgnored private var knownAgentIds: Set<String>
+    @ObservationIgnored private var members: [WorkspaceTabContent]
+    /// Members whose tab was closed while their agent is archived or terminal killed, so reconcile
+    /// doesn't reopen them meanwhile. Session only.
+    @ObservationIgnored private var hidden: Set<WorkspaceTabContent> = []
+    /// Set while we close a tab ourselves; the user closing one goes through `closeRequest`.
+    @ObservationIgnored private var isClosingInternally = false
     @ObservationIgnored private var pendingRestore: WorkspaceLayout?
     @ObservationIgnored private var pendingFocus: WorkspaceTabContent?
     @ObservationIgnored private var started = false
@@ -31,21 +40,22 @@ final class WorkspaceTabs {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     /// - Parameters:
-    ///   - agentIds: the workspace's agents, most recent first; each gets a tab unless `saved` applies.
-    ///   - saved: a previously saved layout. Tabs whose target is gone are dropped.
-    init(workspaceId: String, agentIds: [String], saved: WorkspaceLayout?,
+    ///   - members: the workspace's agents and terminals in tab order.
+    ///   - saved: a previously saved layout. Tabs whose target is gone are dropped; members missing
+    ///     from it get a tab once it's rebuilt.
+    init(workspaceId: String, members: [WorkspaceTabContent], saved: WorkspaceLayout?,
          label: @escaping LabelProvider, save: @escaping (WorkspaceLayout?) -> Void)
     {
         self.workspaceId = workspaceId
+        self.members = members
         self.label = label
         self.save = save
-        knownAgentIds = Set(agentIds)
         let placeholders = controller.allTabIds  // Bonsplit starts with a "Welcome" tab
         if let layout = saved?.pruned(keeping: { label($0) != nil }) {
             pendingRestore = layout
             lastSaved = layout
         } else {
-            let opened = agentIds.compactMap { addTab(.agent(AgentTab(agentId: $0)), in: nil) }
+            let opened = members.compactMap { addTab($0, in: nil) }
             if let first = opened.first { controller.selectTab(first) }
         }
         placeholders.forEach { controller.closeTab($0) }
@@ -106,7 +116,7 @@ final class WorkspaceTabs {
                 controller.selectTab(existing)
                 return
             }
-            controller.closeTab(existing)
+            closeInternally(existing)
         }
         addTab(content, in: pane)
     }
@@ -119,25 +129,47 @@ final class WorkspaceTabs {
         else { return nil }
         contents[id] = content
         if let uuid = bonsplitUUID(id) { tabsByUUID[uuid] = id }
-        if let agentId = content.agentId { knownAgentIds.insert(agentId) }
+        hidden.remove(content)
         return id
+    }
+
+    /// Appends tabs to the focused pane without changing which tab it shows (Bonsplit selects
+    /// every tab it creates, and inserts it after the selected one).
+    private func addInBackground(_ new: [WorkspaceTabContent]) {
+        guard !new.isEmpty, let pane = controller.focusedPaneId ?? controller.allPaneIds.first else { return }
+        let selected = controller.selectedTab(inPane: pane)?.id
+        if let last = controller.tabs(inPane: pane).last { controller.selectTab(last.id) }
+        let added = new.compactMap { addTab($0, in: pane) }
+        if let keep = selected ?? added.first { controller.selectTab(keep) }
+    }
+
+    private func closeInternally(_ id: TabID) {
+        isClosingInternally = true
+        defer { isClosingInternally = false }
+        controller.closeTab(id)
+    }
+
+    /// Closes `content`'s tab and keeps it closed while its agent is archived or terminal killed.
+    func close(_ content: WorkspaceTabContent) {
+        hidden.insert(content)
+        if let id = tabID(for: content) { closeInternally(id) }
     }
 
     // MARK: Keeping in sync with the model
 
-    /// Opens tabs for agents created in this workspace since we last looked.
-    func reconcile(agentIds: [String]) {
+    /// Gives a tab to every member that has none.
+    func reconcile(members: [WorkspaceTabContent]) {
+        self.members = members
         guard isReady else { return }
-        let new = agentIds.filter { !knownAgentIds.contains($0) }
-        knownAgentIds.formUnion(agentIds)
-        for agentId in new.reversed() { addTab(.agent(AgentTab(agentId: agentId)), in: nil) }
+        let open = Set(contents.values)
+        addInBackground(members.filter { !open.contains($0) && !hidden.contains($0) })
     }
 
     /// Re-reads every tab's label and closes tabs whose target is gone.
     func refreshLabels() {
         for (id, content) in contents {
             guard let label = label(content) else {
-                controller.closeTab(id)
+                closeInternally(id)
                 continue
             }
             guard let tab = controller.tab(id),
@@ -182,6 +214,7 @@ final class WorkspaceTabs {
 
     private func becomeReady() {
         isReady = true
+        reconcile(members: members)
         if let content = pendingFocus {
             pendingFocus = nil
             open(content)
@@ -217,6 +250,12 @@ final class WorkspaceTabs {
 }
 
 extension WorkspaceTabs: @preconcurrency BonsplitDelegate {
+    func splitTabBar(_ controller: BonsplitController, shouldCloseTab tab: Tab, inPane pane: PaneID) -> Bool {
+        guard !isClosingInternally, let content = contents[tab.id] else { return true }
+        closeRequest = content
+        return false
+    }
+
     func splitTabBar(_ controller: BonsplitController, didCloseTab tabId: TabID, fromPane pane: PaneID) {
         contents[tabId] = nil
         if let uuid = bonsplitUUID(tabId) { tabsByUUID[uuid] = nil }
@@ -243,12 +282,19 @@ final class WorkspaceTabsRegistry {
         let workspaceId = workspace.id
         let created = WorkspaceTabs(
             workspaceId: workspaceId,
-            agentIds: model.agents(in: workspace).map(\.id),
+            members: model.tabMembers(of: workspace),
             saved: WorkspaceLayoutStore.load(server: server, workspace: workspaceId),
             label: { [weak model] content in model.flatMap { content.kind.label(in: $0) } },
             save: { WorkspaceLayoutStore.save($0, server: server, workspace: workspaceId) })
         tabs[workspaceId] = created
         return created
+    }
+}
+
+extension AppModel {
+    /// What gets a tab in `workspace`: its agents, most recent first, then its terminals.
+    func tabMembers(of workspace: Workspace) -> [WorkspaceTabContent] {
+        agents(in: workspace).map { .agent(AgentTab(agentId: $0.id)) } + terminals.terminals(in: workspace).map(workspace.tab(for:))
     }
 }
 #endif

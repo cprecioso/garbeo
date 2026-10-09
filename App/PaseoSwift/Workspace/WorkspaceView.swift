@@ -9,6 +9,12 @@ struct WorkspaceView: View {
     let workspace: Workspace
     let tabs: WorkspaceTabs
     @Binding var showingNewAgent: Bool
+    @State private var pendingClose: PendingClose?
+
+    private struct PendingClose {
+        var content: WorkspaceTabContent
+        var confirmation: WorkspaceTabCloseConfirmation
+    }
 
     var body: some View {
         let agents = model.agents(in: workspace)
@@ -60,11 +66,29 @@ struct WorkspaceView: View {
             await tabs.debugSplitIfRequested()
             #endif
         }
-        .onChange(of: agents.map(\.id)) { _, agentIds in tabs.reconcile(agentIds: agentIds) }
+        .onChange(of: model.tabMembers(of: workspace)) { _, members in tabs.reconcile(members: members) }
+        .onChange(of: tabs.closeRequest) { _, content in
+            guard let content else { return }
+            tabs.closeRequest = nil
+            if let confirmation = content.kind.closeConfirmation(in: model) {
+                pendingClose = PendingClose(content: content, confirmation: confirmation)
+            } else {
+                close(content)
+            }
+        }
+        .confirmationDialog(
+            Text(pendingClose?.confirmation.title ?? ""),
+            isPresented: Binding(get: { pendingClose != nil }, set: { if !$0 { pendingClose = nil } }),
+            presenting: pendingClose
+        ) { pending in
+            Button(pending.confirmation.action, role: .destructive) { close(pending.content) }
+        } message: { pending in
+            Text(pending.confirmation.message)
+        }
         .onChange(of: labels) { tabs.refreshLabels() }
         .onChange(of: tabs.layout) { _, layout in tabs.layoutChanged(layout) }
         .onChange(of: model.selection, initial: true) { _, selection in
-            // Selecting an agent or terminal in the sidebar focuses (or opens) its tab.
+            // Selecting an agent or terminal (a new one, a debug launch flag) focuses (or opens) its tab.
             switch selection {
             case .agent(let agentId) where agents.contains { $0.id == agentId }:
                 tabs.open(.agent(AgentTab(agentId: agentId)))
@@ -83,11 +107,17 @@ struct WorkspaceView: View {
             tabs.open(.plugin(PluginTab(target: request)))
         }
         .onChange(of: tabs.focusedContent) { _, content in
-            // ...and the sidebar follows the focused tab.
+            // ...and the selection follows the focused tab (the sidebar highlights its workspace).
             guard tabs.isReady else { return }
             let selection = content?.sidebarSelection ?? .workspace(workspace.id)
             if model.selection != selection { model.selection = selection }
         }
+    }
+
+    /// Closes the tab, then archives its agent or kills its terminal.
+    private func close(_ content: WorkspaceTabContent) {
+        tabs.close(content)
+        Task { await content.kind.close(in: model) }
     }
 }
 

@@ -12,9 +12,9 @@ enum ConnectionState: Equatable {
     var isConnected: Bool { if case .connected = self { true } else { false } }
 }
 
-/// What the sidebar has selected. iOS selects agents and terminals; macOS can also select a
-/// workspace, which opens its tabbed workspace view (selecting an agent or terminal there focuses
-/// its tab).
+/// What the sidebar has selected. iOS selects agents and terminals. The macOS sidebar lists only
+/// workspaces, which open as tabs; there an agent or terminal selection is the focused tab (or a
+/// tab to focus), and the sidebar highlights its workspace.
 enum SidebarSelection: Hashable {
     case agent(String)
     case workspace(String)
