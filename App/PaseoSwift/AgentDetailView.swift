@@ -1,4 +1,5 @@
 import PaseoKit
+import PaseoSyntax
 import SwiftUI
 
 struct AgentDetailView: View {
@@ -328,7 +329,7 @@ private struct ToolCallRow: View {
         CollapsibleRow(icon: icon, title: call.name, subtitle: call.detail.summary, tint: tint, trailing: statusView, isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: 6) {
                 if let body = call.detail.body, !body.isEmpty {
-                    CodeBlock(text: String(body.prefix(20_000)), isDiff: call.detail.type == "edit")
+                    CodeBlock(text: String(body.prefix(20_000)), isDiff: call.detail.type == "edit", language: language)
                 }
                 if let error = call.error, !error.isNull {
                     Text(error.displayString).font(.caption.monospaced()).foregroundStyle(.red).textSelection(.enabled)
@@ -338,6 +339,11 @@ private struct ToolCallRow: View {
                 }
             }
         }
+    }
+
+    /// Read, written and edited files are highlighted by their extension.
+    private var language: SyntaxLanguage? {
+        call.detail.filePath.flatMap(SyntaxLanguage.init(path:))
     }
 
     private var icon: String {
@@ -422,33 +428,6 @@ private struct CollapsibleRow<Content: View, Trailing: View>: View {
     }
 }
 
-struct CodeBlock: View {
-    let text: String
-    var isDiff = false
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            Group {
-                if isDiff {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, line in
-                            Text(String(line))
-                                .foregroundStyle(line.hasPrefix("+") ? .green : line.hasPrefix("-") ? .red : .primary)
-                        }
-                    }
-                } else {
-                    Text(text)
-                }
-            }
-            .font(.caption.monospaced())
-            .textSelection(.enabled)
-            .padding(10)
-        }
-        .frame(maxHeight: 360)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-    }
-}
-
 // MARK: - Permissions
 
 private struct PermissionCard: View {
@@ -463,8 +442,8 @@ private struct PermissionCard: View {
                 .font(.headline)
                 .foregroundStyle(.orange)
             if let description = request.description { Text(description).font(.callout) }
-            if let detail = request.detail, let body = detail.summary ?? detail.body {
-                CodeBlock(text: String(body.prefix(4_000)), isDiff: detail.type == "edit")
+            if let detail = request.detail, let shown = shownText(of: detail) {
+                CodeBlock(text: String(shown.prefix(4_000)), isDiff: detail.type == "edit", language: language(of: detail))
             } else if let input = request.input {
                 CodeBlock(text: String(input.displayString.prefix(4_000)))
             }
@@ -485,6 +464,19 @@ private struct PermissionCard: View {
         .padding(12)
         .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.orange.opacity(0.4)))
+    }
+
+    /// An edit shows its diff; anything else its one-line summary (the command, path, query, …).
+    private func shownText(of detail: ToolCallDetail) -> String? {
+        detail.type == "edit" ? detail.body ?? detail.summary : detail.summary ?? detail.body
+    }
+
+    private func language(of detail: ToolCallDetail) -> SyntaxLanguage? {
+        switch detail.type {
+        case "shell": .bash
+        case "edit": detail.filePath.flatMap(SyntaxLanguage.init(path:))
+        default: nil
+        }
     }
 
     @ViewBuilder

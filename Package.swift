@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "PaseoKit", targets: ["PaseoKit"]),
         .library(name: "PaseoTerminal", targets: ["PaseoTerminal"]),
+        .library(name: "PaseoSyntax", targets: ["PaseoSyntax"]),
     ],
     dependencies: [
         // libsodium: Curve25519 + XSalsa20-Poly1305 (NaCl box) for relay E2EE. CryptoKit has no XSalsa20.
@@ -21,11 +22,17 @@ let package = Package(
             dependencies: [.product(name: "Clibsodium", package: "swift-sodium")]
         ),
         .target(name: "PaseoTerminal", dependencies: ["PaseoKit", .product(name: "SwiftTerm", package: "SwiftTerm")]),
+        .target(
+            name: "PaseoSyntax",
+            // web-tree-sitter (from the tree-sitter release's web-tree-sitter.tar.gz), which runs the downloaded grammars.
+            resources: [.copy("Web")]
+        ),
         .testTarget(
             name: "PaseoKitTests",
             dependencies: ["PaseoKit"],
             resources: [.copy("Resources"), .copy("Fixtures")]
         ),
         .testTarget(name: "PaseoTerminalTests", dependencies: ["PaseoTerminal", .product(name: "SwiftTerm", package: "SwiftTerm")]),
+        .testTarget(name: "PaseoSyntaxTests", dependencies: ["PaseoSyntax"]),
     ]
 )

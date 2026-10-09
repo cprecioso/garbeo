@@ -9,7 +9,8 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Saved hosts list; relay daemon keys and passwords live in the Keychain. The sidebar footer shows whether the connection is direct or relayed
 - Live sidebar: projects → workspaces (iOS: → agents and terminals), with status, diff stats, and permission badges, kept in sync through daemon subscriptions
 - macOS workspaces as tabs (one per agent and terminal) that drag into nested horizontal/vertical split panes ([Bonsplit](https://bonsplit.alasdairmonk.com/)), each pane with its own live timeline. Layouts persist per workspace across launches
-- Agent timeline: markdown replies ([Textual](https://github.com/gonzalezreal/textual): tables, syntax-highlighted code, text selection), collapsible reasoning, tool calls (shell, read, edit diffs, search, fetch, sub-agents), task lists, errors. Streams live, with "load earlier" paging
+- Agent timeline: markdown replies ([Textual](https://github.com/gonzalezreal/textual): tables, code blocks, text selection), collapsible reasoning, tool calls (shell, read, edit diffs, search, fetch, sub-agents), task lists, errors. Streams live, with "load earlier" paging
+- Syntax highlighting with [tree-sitter](https://tree-sitter.github.io) grammars, downloaded on first use, for markdown code blocks, read/written files, edit diffs (old and new sides parsed separately) and shell commands in permission requests (see [Syntax highlighting](#syntax-highlighting))
 - Send messages (optimistic, confirmed when the daemon echoes them), stop a running turn, change permission mode, archive
 - Answer permission requests inline (provider-supplied actions or Allow/Deny)
 - Create agents: workspace, provider, model, thinking level, mode, prompt
@@ -20,7 +21,8 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 ## Layout
 
 ```
-Package.swift            PaseoKit + PaseoTerminal libraries (PaseoKit depends on swift-sodium, PaseoTerminal on SwiftTerm)
+Package.swift            PaseoKit + PaseoTerminal + PaseoSyntax libraries (PaseoKit depends on swift-sodium, PaseoTerminal on SwiftTerm,
+                         PaseoSyntax on WebKit only)
 Sources/PaseoKit/
   DaemonClient.swift     hello handshake, requestId correlation, subscriptions, ping, binary frames
   DaemonTransport.swift  transport protocol + plain WebSocket transport; endpoint → transport selection
@@ -34,10 +36,19 @@ Sources/PaseoKit/
   Terminals.swift        terminal requests, slot-routed output streams
   Plugins.swift          plugin list/catalog/RPC requests and catalog-change events
 Sources/PaseoTerminal/   PaseoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
+Sources/PaseoSyntax/
+  SyntaxLanguage.swift   languages; detection from file paths and markdown fence names
+  Grammars.swift         grammar table (release wasm + query files, pinned by SHA-256), download cache
+  WebHighlighter.swift   hidden WebPage running the grammars in web-tree-sitter, injected languages as layers
+  Web/                   web-tree-sitter (vendored from the tree-sitter release) and its glue, highlighter.js
+  SyntaxHighlighter.swift  code → sorted, non-overlapping capture spans (tree-sitter-highlight precedence)
+  SyntaxDiff.swift       unified/line diffs split into lines, old and new sides highlighted separately
+  SyntaxTheme.swift      GitHub (Primer) colors per capture, light and dark; spans → AttributedString
 Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
   Resources/relay-vectors.json  known-answer vectors generated from the upstream TypeScript
   Fixtures/terminal-vectors.json  terminal codec vectors generated from the upstream TypeScript
 Tests/PaseoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter
+Tests/PaseoSyntaxTests/  every grammar downloads and highlights a sample; precedence, injections, diffs, language detection
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
 App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
@@ -53,6 +64,18 @@ PluginHost/              source of the JS host runtime (React, react-native-web,
 The sidebar lists only workspaces; selecting one opens it as tabs. Every agent and terminal of the workspace gets a tab, including ones created later (appended to the focused pane without taking focus); creating one in the app focuses its tab. Subagents working in their parent's workspace are the exception: they open from the Open Tab menu, and the daemon is told (through an open-tab label) so it keeps them if their parent is archived. As in Paseo's own app, closing a tab archives its agent (confirming first if it's running), only closes the tab of a subagent, or kills its terminal (always confirmed). Tabs show agents (`AgentTab`) and terminals (`TerminalTab`); the toolbar's Open Tab menu lists both and creates terminals. A terminal tab only takes keyboard focus, and with it the PTY size claim, when it was just selected, not when restored. Drag a tab onto a pane's edge to split, onto its center or another tab bar to move it; the tab bar's split buttons create an empty pane. Bonsplit owns the tree; `WorkspaceTabs` maps its tabs to `WorkspaceTabContent` and saves the layout (derived from `treeSnapshot()`) to UserDefaults per daemon and workspace.
 
 To add a tab kind (plugin webview, …), write a struct conforming to `WorkspaceTabKind` (a label, a content view, and optionally what closing it does) and add one `case` plus its `kind` arm to `WorkspaceTabContent` in `Workspace/WorkspaceTabContent.swift`. Tab bar, splits, drag and drop and persistence need nothing else.
+
+## Syntax highlighting
+
+`PaseoSyntax` parses with tree-sitter and colors the captures of each grammar's own `highlights.scm`: Bash, C, C++, C#, CSS, Elixir, Go, Haskell, HTML, Java, JavaScript/JSX, JSON, Julia, Kotlin, Lua, Make, Markdown, Objective-C, OCaml, Perl, PHP, Python, R, Ruby, Rust, Scala, Swift, TOML, TypeScript, TSX, XML (plists, storyboards, SVG, …), YAML and Zig. Injections are followed, so HTML `<script>`/`<style>`, JS tagged templates, Rust macro bodies and markdown fences and inline markup are highlighted in their own language.
+
+No grammar ships with the app. The first block in a language downloads its grammar's `.wasm` from the grammar's GitHub release and its query files from the repository at the same tag, checks each against the SHA-256 in `Grammars.swift`, and keeps them in the caches directory (all of them come to about 55 MB). The block stays plain until then, markdown fences keep Textual's Prism highlighting if the download fails, and a failed download is retried after a minute.
+
+The wasm runs in [web-tree-sitter](https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web) inside a `WebPage` that's never shown, the same on macOS and iOS: iOS forbids JIT in the app process, but WebKit's web content process runs wasm with it. The page starts with the first block to highlight, and a new one starts if iOS reclaims its process. Each language is a layer: `WebHighlighter` highlights the code, then every injected language over the ranges it covers (combined into one layer per language, as SwiftTreeSitterLayer does), and so on. The captures come back to Swift, where the deepest layer, then the innermost node, then the latest pattern wins.
+
+In the app, `CodeBlock` highlights tool call bodies off the main actor and caches the result. Markdown code blocks go through a Textual `CodeBlockStyle` that renders the highlighted code with Textual's `InlineText` (so it stays part of the reply's text selection); fences in other languages keep Textual's Prism highlighting. Textual doesn't expose a code block's text, so the style reads it from `CodeBlockProxy` with `Mirror`; if a Textual update renames that property, every block falls back to Prism.
+
+To add a language: its grammar's GitHub release must include `tree-sitter-<name>.wasm`. Add a case to `SyntaxLanguage` (plus extensions and aliases), its entry in `Grammars.grammar(for:)` with each file's `shasum -a 256` (queries it inherits from a base grammar first, as C++ and TypeScript do), and a sample in `GrammarTests`. `swift test --filter PaseoSyntaxTests` downloads every grammar (once; it needs the network the first time) and highlights its sample, so it catches a moved tag, wasm web-tree-sitter can't load, and queries that don't compile. To update web-tree-sitter, replace `Sources/PaseoSyntax/Web/web-tree-sitter.{js,wasm}` with the ones in a tree-sitter release's `web-tree-sitter.tar.gz` (currently 0.27.1) and run the same tests.
 
 ## Build and run
 
