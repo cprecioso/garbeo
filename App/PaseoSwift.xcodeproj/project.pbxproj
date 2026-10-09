@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AB12CD34EF56000000000001 /* PaseoKit in Frameworks */ = {isa = PBXBuildFile; productRef = AB12CD34EF56000000000006 /* PaseoKit */; };
+		AB12CD34EF56000000000101 /* PaseoTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = AB12CD34EF56000000000106 /* PaseoTerminal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +30,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB12CD34EF56000000000001 /* PaseoKit in Frameworks */,
+				AB12CD34EF56000000000101 /* PaseoTerminal in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -73,6 +75,7 @@
 			name = PaseoSwift;
 			packageProductDependencies = (
 				AB12CD34EF56000000000006 /* PaseoKit */,
+				AB12CD34EF56000000000106 /* PaseoTerminal */,
 			);
 			productName = PaseoSwift;
 			productReference = AB12CD34EF56000000000007 /* PaseoSwift.app */;
@@ -268,6 +271,10 @@
 		AB12CD34EF56000000000006 /* PaseoKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PaseoKit;
+		};
+		AB12CD34EF56000000000106 /* PaseoTerminal */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PaseoTerminal;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

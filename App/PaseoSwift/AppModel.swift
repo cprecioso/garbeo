@@ -30,15 +30,19 @@ final class AppModel {
     private(set) var timelineError: String?
     private(set) var isLoadingOlder = false
     var selectedAgentId: String? {
-        didSet { if oldValue != selectedAgentId { Task { await viewAgent(selectedAgentId) } } }
+        didSet {
+            if selectedAgentId != nil { terminals.selectedTerminalId = nil }
+            if oldValue != selectedAgentId { Task { await viewAgent(selectedAgentId) } }
+        }
     }
+    let terminals = TerminalDirectory()
     var lastError: String?
 
     var endpoint: DaemonEndpoint? {
         didSet { Self.saveEndpoint(endpoint) }
     }
 
-    private var client: DaemonClient?
+    private(set) var client: DaemonClient?
     private var eventTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
     private var generation = 0
@@ -53,6 +57,7 @@ final class AppModel {
             defaults.set(clientId, forKey: "clientId")
         }
         endpoint = Self.loadEndpoint()
+        terminals.onError = { [weak self] in self?.lastError = $0 }
     }
 
     // MARK: Derived state
@@ -119,6 +124,7 @@ final class AppModel {
         permissions = [:]
         timeline = AgentTimeline()
         selectedAgentId = nil
+        terminals.reset()
     }
 
     func forgetEndpoint() {
@@ -175,6 +181,16 @@ final class AppModel {
         try await client.subscribeToSessionEvents([
             "agent_permission_request", "agent_permission_resolved", "agent_attention_required",
         ])
+        // Terminal lists aren't needed to show the sidebar; don't hold up the connection for them.
+        Task {
+            await terminals.connect(client, workspaces: Array(workspaces.values))
+            #if DEBUG
+            // Development aid: `-PaseoSelectTerminal first|new|<terminalId>` opens a terminal on launch.
+            if let requested = UserDefaults.standard.string(forKey: "PaseoSelectTerminal") {
+                await terminals.applyDebugSelection(requested, workspaces: projects.flatMap(\.workspaces))
+            }
+            #endif
+        }
         if let selectedAgentId, agents[selectedAgentId] != nil {
             await viewAgent(selectedAgentId)
         } else if selectedAgentId != nil {
@@ -218,8 +234,12 @@ final class AppModel {
             if selectedAgentId == agentId { selectedAgentId = nil }
         case .workspaceUpdate(.upsert(let workspace)):
             workspaces[workspace.id] = workspace
+            Task { await terminals.observe(workspace) }
         case .workspaceUpdate(.remove(let id)):
             workspaces[id] = nil
+            terminals.forget(workspaceId: id)
+        case .terminalsChanged(let change):
+            terminals.apply(change)
         case .agentStream(let payload):
             handleStream(payload)
         case .permissionRequested(let payload):

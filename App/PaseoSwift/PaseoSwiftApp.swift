@@ -79,7 +79,10 @@ struct MainView: View {
             SidebarView(showingNewAgent: $showingNewAgent)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
-            if let agent = model.selectedAgent {
+            if let terminal = model.terminals.selectedTerminal {
+                TerminalDetailView(terminal: terminal)
+                    .id(terminal.id)
+            } else if let agent = model.selectedAgent {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
