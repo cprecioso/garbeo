@@ -16,6 +16,7 @@ public enum PaseoError: LocalizedError, Sendable, Equatable {
             case "password_required": "This daemon requires a password."
             case "incorrect_password": "Incorrect password."
             case "incompatible_protocol": "This daemon speaks an incompatible protocol version."
+            case "relay_closed_during_hello": "The daemon closed the relay connection while signing in. Check the password."
             default: "Connection rejected: \(reason)"
             }
         case .rpc(let message): message
@@ -75,8 +76,8 @@ public actor DaemonClient {
     private let endpoint: DaemonEndpoint
     private let clientId: String
     private let clientType: String
-    private let session: URLSession
-    private var task: URLSessionWebSocketTask?
+    private let makeTransport: @Sendable () throws -> any DaemonTransport
+    private var transport: (any DaemonTransport)?
     private var pending: [String: CheckedContinuation<Data, Error>] = [:]
     private var receiveLoop: Task<Void, Never>?
     private var pingLoop: Task<Void, Never>?
@@ -93,13 +94,27 @@ public actor DaemonClient {
         "all_providers": true,
     ]
 
-    public init(endpoint: DaemonEndpoint, clientId: String, clientType: String = DaemonClient.defaultClientType) {
+    /// Whether this client reaches the daemon directly or through the E2EE relay.
+    public nonisolated let transportKind: TransportKind
+
+    /// - Parameter transportFactory: Overrides how the endpoint is reached (tests). By default the
+    ///   endpoint picks a direct WebSocket or the relay with end-to-end encryption.
+    public init(
+        endpoint: DaemonEndpoint, clientId: String, clientType: String = DaemonClient.defaultClientType,
+        transportFactory: (@Sendable () throws -> any DaemonTransport)? = nil
+    ) {
         self.endpoint = endpoint
         self.clientId = clientId
         self.clientType = clientType
-        let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 30
-        self.session = URLSession(configuration: configuration)
+        transportKind = endpoint.transportKind
+        if let transportFactory {
+            makeTransport = transportFactory
+        } else {
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 30
+            let session = URLSession(configuration: configuration)
+            makeTransport = { try endpoint.makeTransport(session: session) }
+        }
         (events, eventContinuation) = AsyncStream.makeStream(of: DaemonEvent.self, bufferingPolicy: .unbounded)
     }
 
@@ -114,12 +129,11 @@ public actor DaemonClient {
     // MARK: Connection
 
     @discardableResult
-    public func connect(timeout: Duration = .seconds(10)) async throws -> ServerInfo {
-        let url = try endpoint.webSocketURL()
-        let task = session.webSocketTask(with: url)
-        task.maximumMessageSize = 64 * 1024 * 1024
-        self.task = task
-        task.resume()
+    public func connect(timeout: Duration? = nil) async throws -> ServerInfo {
+        // The relay adds a hop and the E2EE handshake, so it gets more time by default.
+        let timeout = timeout ?? (transportKind == .relay ? .seconds(20) : .seconds(10))
+        let transport = try makeTransport()
+        self.transport = transport
 
         var hello: [String: JSONValue] = [
             "type": "hello",
@@ -132,19 +146,28 @@ public actor DaemonClient {
             hello["auth"] = ["kind": "password", "password": .string(password)]
         }
 
+        let helloMessage = JSONValue.object(hello)
+        // Over the relay the daemon's `hello.rejected` can be lost behind its 4401 close, which the
+        // relay reports as a generic disconnect.
+        let rejectionIsAmbiguous = transportKind == .relay && hello["auth"] != nil
         do {
-            try await sendRaw(.object(hello))
             // The task group waits for every child, so a timeout must also unblock `receive()`.
-            let info = try await withTimeout(timeout, onTimeout: { task.cancel(with: .goingAway, reason: nil) }) {
-                try await Self.awaitServerInfo(task)
+            let info = try await withTimeout(timeout, onTimeout: { transport.close() }) {
+                try await transport.open()
+                try await Self.send(helloMessage, over: transport)
+                do {
+                    return try await Self.awaitServerInfo(transport)
+                } catch is TransportClosed where rejectionIsAmbiguous {
+                    throw PaseoError.helloRejected(reason: "relay_closed_during_hello")
+                }
             }
             serverInfo = info
             lastInbound = Date()
             startLoops()
             return info
         } catch {
-            task.cancel(with: .goingAway, reason: nil)
-            self.task = nil
+            transport.close()
+            self.transport = nil
             throw error
         }
     }
@@ -152,18 +175,14 @@ public actor DaemonClient {
     public func disconnect() {
         guard !closed else { return }
         closed = true
-        task?.cancel(with: .normalClosure, reason: nil)
+        transport?.close()
         teardown(reason: nil)
     }
 
-    private static func awaitServerInfo(_ task: URLSessionWebSocketTask) async throws -> ServerInfo {
+    private static func awaitServerInfo(_ transport: any DaemonTransport) async throws -> ServerInfo {
         while true {
-            let data: Data
-            switch try await task.receive() {
-            case .string(let text): data = Data(text.utf8)
-            case .data: continue
-            @unknown default: continue
-            }
+            guard case .text(let text) = try await transport.receive() else { continue }
+            let data = Data(text.utf8)
             let header = try JSONDecoder().decode(FrameHeader.self, from: data)
             if header.type == "hello.rejected" {
                 throw PaseoError.helloRejected(reason: header.reason ?? "unknown")
@@ -192,7 +211,7 @@ public actor DaemonClient {
     private func tickLiveness() async {
         guard !closed else { return }
         if Date().timeIntervalSince(lastInbound) > 35 {
-            task?.cancel(with: .goingAway, reason: nil)
+            transport?.close()
             teardown(reason: "Connection timed out")
             return
         }
@@ -200,11 +219,11 @@ public actor DaemonClient {
     }
 
     private func runReceiveLoop() async {
-        while let task, !closed {
+        while let transport, !closed {
             do {
-                let message = try await task.receive()
+                let message = try await transport.receive()
                 lastInbound = Date()
-                if case .string(let text) = message {
+                if case .text(let text) = message {
                     handleFrame(Data(text.utf8))
                 }
             } catch {
@@ -215,8 +234,8 @@ public actor DaemonClient {
     }
 
     private func teardown(reason: String?) {
-        let wasOpen = task != nil
-        task = nil
+        let wasOpen = transport != nil
+        transport = nil
         closed = true
         receiveLoop?.cancel()
         pingLoop?.cancel()
@@ -266,9 +285,13 @@ public actor DaemonClient {
     // MARK: Requests
 
     private func sendRaw(_ value: JSONValue) async throws {
-        guard let task else { throw PaseoError.disconnected }
+        guard let transport else { throw PaseoError.disconnected }
+        try await Self.send(value, over: transport)
+    }
+
+    private static func send(_ value: JSONValue, over transport: any DaemonTransport) async throws {
         let data = try JSONEncoder().encode(value)
-        try await task.send(.string(String(decoding: data, as: UTF8.self)))
+        try await transport.send(.text(String(decoding: data, as: UTF8.self)))
     }
 
     /// Sends a session message without waiting for a reply.
@@ -278,7 +301,7 @@ public actor DaemonClient {
 
     /// Sends a session request and returns the raw frame of its correlated response.
     public func requestData(_ message: [String: JSONValue], timeout: Duration = .seconds(60)) async throws -> Data {
-        guard task != nil, !closed else { throw PaseoError.disconnected }
+        guard transport != nil, !closed else { throw PaseoError.disconnected }
         let requestId = UUID().uuidString.lowercased()
         var message = message
         message["requestId"] = .string(requestId)
@@ -303,7 +326,7 @@ public actor DaemonClient {
     }
 
     private func register(_ requestId: String, continuation: CheckedContinuation<Data, Error>, envelope: JSONValue) async {
-        guard task != nil, !closed else {
+        guard transport != nil, !closed else {
             continuation.resume(throwing: PaseoError.disconnected)
             return
         }

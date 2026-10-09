@@ -24,6 +24,7 @@ enum DebugSnapshot {
     private static func capture(to path: String, model: AppModel) {
         let summary = """
         connected: \(model.connection.isConnected)
+        transport: \(model.endpoint.map { "\($0.transportKind.label) \($0.displayAddress)" } ?? "-")
         projects: \(model.projects.map { "\($0.name)[\($0.workspaces.map { "\($0.displayName):\(model.agents(in: $0).count)" }.joined(separator: ","))]" })
         unplaced: \(model.unplacedAgents.count)
         workspaces: \(model.workspaces.count) agents: \(model.agents.count)
