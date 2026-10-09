@@ -9,11 +9,19 @@ struct ConnectView: View {
     @State private var isConnecting = false
     @State private var inputError: String?
     @State private var showingScanner = false
+    @State private var localDaemonRunning = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 header
+
+                if localDaemonRunning && !hostStore.hosts.contains(where: LocalDaemon.matches) {
+                    LocalDaemonBanner(action: connectToLocalDaemon)
+                        .disabled(isConnecting)
+                        .padding(.horizontal, 20)
+                        .frame(maxWidth: 480)
+                }
 
                 Form {
                     if !hostStore.hosts.isEmpty {
@@ -104,7 +112,14 @@ struct ConnectView: View {
                 address = endpoint.url
                 password = endpoint.password ?? ""
             } else if hostStore.hosts.isEmpty {
-                address = "127.0.0.1:6767"
+                address = LocalDaemon.address
+            }
+        }
+        .task {
+            // Keep probing so the banner appears when the daemon starts while this screen is up.
+            while !Task.isCancelled {
+                localDaemonRunning = await LocalDaemon.isRunning()
+                try? await Task.sleep(for: .seconds(3))
             }
         }
         #if os(iOS)
@@ -144,6 +159,12 @@ struct ConnectView: View {
         } else {
             connect(DaemonEndpoint(url: input, password: password))
         }
+    }
+
+    /// Fills in the local address and connects, using the password field if the daemon needs one.
+    private func connectToLocalDaemon() {
+        address = LocalDaemon.address
+        connectToInput()
     }
 
     private func pairWithLink(_ link: String) {
@@ -192,6 +213,49 @@ private struct SavedHostRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// A daemon listening on the default local address (this Mac, or the host Mac from the iOS Simulator).
+private enum LocalDaemon {
+    static let address = "127.0.0.1:6767"
+
+    /// `GET /api/health` is the one daemon route that needs no password.
+    static func isRunning() async -> Bool {
+        struct Health: Decodable { var status: String }
+        let request = URLRequest(
+            url: URL(string: "http://\(address)/api/health")!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 2)
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200
+        else { return false }
+        return (try? JSONDecoder().decode(Health.self, from: data))?.status == "ok"
+    }
+
+    /// Whether a saved host already points at the local daemon (`localhost:6767`, `ws://127.0.0.1:6767/ws`, …).
+    static func matches(_ host: SavedHost) -> Bool {
+        guard host.kind == .direct, let url = try? DaemonEndpoint(url: host.address).webSocketURL() else { return false }
+        return ["127.0.0.1", "localhost", "::1"].contains(url.host() ?? "") && url.port == 6767
+    }
+}
+
+private struct LocalDaemonBanner: View {
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "desktopcomputer")
+                .font(.title2)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Local daemon detected").font(.headline)
+                Text(verbatim: LocalDaemon.address).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Connect", action: action)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(12)
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
