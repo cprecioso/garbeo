@@ -9,7 +9,7 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Saved hosts list; relay daemon keys and passwords live in the Keychain. The sidebar footer shows whether the connection is direct or relayed
 - Live sidebar: projects → workspaces → agents, with status, diff stats, and permission badges, kept in sync through daemon subscriptions
 - macOS workspaces as tabs (one per agent to start) that drag into nested horizontal/vertical split panes ([Bonsplit](https://bonsplit.alasdairmonk.com/)), each pane with its own live timeline. Layouts persist per workspace across launches
-- Agent timeline: markdown replies, collapsible reasoning, tool calls (shell, read, edit diffs, search, fetch, sub-agents), task lists, errors. Streams live, with "load earlier" paging
+- Agent timeline: markdown replies ([Textual](https://github.com/gonzalezreal/textual): tables, syntax-highlighted code, text selection), collapsible reasoning, tool calls (shell, read, edit diffs, search, fetch, sub-agents), task lists, errors. Streams live, with "load earlier" paging
 - Send messages (optimistic, confirmed when the daemon echoes them), stop a running turn, change permission mode, archive
 - Answer permission requests inline (provider-supplied actions or Allow/Deny)
 - Create agents: workspace, provider, model, thinking level, mode, prompt
@@ -40,7 +40,7 @@ Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
 Tests/PaseoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
-App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Bonsplit linked on macOS only)
+App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
 App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner
   Workspace/             workspace tabs: tab content model, saved layout, Bonsplit integration (macOS)
   Plugins/               PluginStore, WKWebView runtime + bridge, PluginPaneView, PluginTab, sidebar/menu entries
