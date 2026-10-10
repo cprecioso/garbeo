@@ -55,10 +55,10 @@
           "product-name": "PaseoKit",
           "build-phase": { "build-phase": "frameworks" },
         }, {
-          "product-name": "PaseoTerminal",
+          "product-name": "PaseoSyntax",
           "build-phase": { "build-phase": "frameworks" },
         }, {
-          "product-name": "PaseoSyntax",
+          "product-name": "PaseoTerminal",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "bonsplit",
