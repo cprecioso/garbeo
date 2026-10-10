@@ -84,7 +84,7 @@
         "INFOPLIST_KEY_UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown",
         "LD_RUNPATH_SEARCH_PATHS": "@executable_path/Frameworks",
         "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "@executable_path/../Frameworks",
-        "MARKETING_VERSION": "0.1.0", // x-release-please-version
+        "MARKETING_VERSION": "0.2.0", // x-release-please-version
         "PRODUCT_BUNDLE_IDENTIFIER": "design.precioso.garbeo",
         "PRODUCT_NAME": "Garbeo",
         "SDKROOT": "auto",
