@@ -1,3 +1,6 @@
 [tools]
 "gem:fastlane" = "latest"
 ruby = "latest"
+
+[bootstrap.packages]
+"brew:libsodium" = "latest"
