@@ -97,7 +97,7 @@ private struct AgentPaneHeader: View {
                 ModeMenu(agent: agent)
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
-                    .labelStyle(width >= 460 ? AnyLabelStyle(.titleAndIcon) : AnyLabelStyle(.iconOnly))
+                    .modifier(CompactLabelStyle(compact: width < 460))
                     .fixedSize()
                 ContextGauge(agent: agent)
             }
@@ -105,7 +105,7 @@ private struct AgentPaneHeader: View {
                 .menuStyle(.button)
                 .buttonStyle(.borderless)
                 .menuIndicator(.hidden)
-                .labelStyle(width >= 460 ? AnyLabelStyle(.titleAndIcon) : AnyLabelStyle(.iconOnly))
+                .modifier(CompactLabelStyle(compact: width < 460))
                 .fixedSize()
         }
         .padding(.horizontal, 12)
@@ -115,14 +115,19 @@ private struct AgentPaneHeader: View {
     }
 }
 
-private struct AnyLabelStyle: LabelStyle {
-    private let make: (Configuration) -> AnyView
+/// Switches between the built-in label styles via `.labelStyle(...)` so SwiftUI installs them
+/// normally. Calling a built-in style's `makeBody` by hand reads its environment values outside
+/// of a view, which always yields defaults and logs a runtime error.
+private struct CompactLabelStyle: ViewModifier {
+    let compact: Bool
 
-    init(_ style: some LabelStyle) {
-        make = { AnyView(style.makeBody(configuration: $0)) }
+    func body(content: Content) -> some View {
+        if compact {
+            content.labelStyle(.iconOnly)
+        } else {
+            content.labelStyle(.titleAndIcon)
+        }
     }
-
-    func makeBody(configuration: Configuration) -> some View { make(configuration) }
 }
 
 private struct ModeMenu: View {
