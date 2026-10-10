@@ -93,7 +93,7 @@ struct ConnectView: View {
                             Task { @MainActor in pairWithLink(link) }
                         }
                         .labelStyle(.titleAndIcon)
-                        .help("Paste a pairing link copied from `paseo daemon pair` or Paseo Desktop")
+                        .help("Paste a pairing link copied from \"paseo daemon pair\" or Paseo Desktop")
                     }
                     .disabled(isConnecting)
                 }
