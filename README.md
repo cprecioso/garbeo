@@ -52,7 +52,7 @@ Tests/PaseoSyntaxTests/  every grammar downloads and highlights a sample; preced
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
 App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
-App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner
+App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner, credits (keep CreditsView in step with dependencies)
   Workspace/             workspace tabs: tab content model, saved layout, Bonsplit integration (macOS)
   Plugins/               PluginStore, WKWebView runtime + bridge, PluginPaneView, PluginTab, sidebar/menu entries
   PluginHost/plugin-host.js  generated JS host runtime (do not edit)
