@@ -29,6 +29,7 @@
     },
   ],
   "files": [
+    { "kind": "folder", "path": "Resources", "target-membership": [ "PaseoSwift" ] },
     { "kind": "folder", "path": "PaseoSwift", "target-membership": [ "PaseoSwift" ] },
     { "path": "Info.plist" },
     {
@@ -71,6 +72,7 @@
         },
       ],
       "build-settings": {
+        "ASSETCATALOG_COMPILER_APPICON_NAME": "Garbeo",
         "AUTOMATION_APPLE_EVENTS": "NO",
         "CODE_SIGN_ENTITLEMENTS": "PaseoSwift/PaseoSwift.entitlements",
         "CODE_SIGN_IDENTITY": "Apple Development",
