@@ -40,7 +40,7 @@ struct QRScannerSheet: View {
                         "Camera scanning unavailable",
                         systemImage: "qrcode.viewfinder",
                         description: Text(DataScannerViewController.isSupported
-                            ? "Allow camera access for Paseo in Settings, or paste the pairing link instead."
+                            ? "Allow camera access for Garbeo in Settings, or paste the pairing link instead."
                             : "This device can't scan QR codes. Paste the pairing link instead."))
                 }
             }

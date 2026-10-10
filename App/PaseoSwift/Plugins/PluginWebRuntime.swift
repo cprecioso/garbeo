@@ -9,7 +9,7 @@ import AppKit
 import UIKit
 #endif
 
-private let log = Logger(subsystem: "dev.paseoswift.client", category: "plugins")
+private let log = Logger(subsystem: "design.precioso.garbeo", category: "plugins")
 
 /// Delegate for what a plugin page asks of the app (navigation, contributions, RPC).
 @MainActor

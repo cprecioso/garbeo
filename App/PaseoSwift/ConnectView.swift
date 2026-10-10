@@ -134,7 +134,7 @@ struct ConnectView: View {
             Image(systemName: "point.3.connected.trianglepath.dotted")
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(.tint)
-            Text("Paseo")
+            Text("Garbeo")
                 .font(.largeTitle.weight(.semibold))
             Text("Connect to a Paseo daemon to manage your coding agents.")
                 .foregroundStyle(.secondary)

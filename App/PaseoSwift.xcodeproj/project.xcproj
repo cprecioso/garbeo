@@ -35,7 +35,7 @@
       "kind": "group",
       "name": "Products",
       "children": [
-        { "path": "<PRODUCTS>/PaseoSwift.app", "id": "AB12CD34EF56000000000007", "type": "wrapper.application", "index": false },
+        { "path": "<PRODUCTS>/Garbeo.app", "id": "AB12CD34EF56000000000007", "type": "wrapper.application", "index": false },
       ],
     },
   ],
@@ -43,7 +43,7 @@
     {
       "name": "PaseoSwift",
       "id": "AB12CD34EF56000000000013",
-      "product": "Products/PaseoSwift.app",
+      "product": "Products/Garbeo.app",
       "product-type": "application",
       "build-phases": [
         "compile-sources",
@@ -77,7 +77,7 @@
         "ENABLE_PREVIEWS": "YES",
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_FILE": "Info.plist",
-        "INFOPLIST_KEY_CFBundleDisplayName": "Paseo",
+        "INFOPLIST_KEY_CFBundleDisplayName": "Garbeo",
         "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.developer-tools",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation": "YES",
         "INFOPLIST_KEY_UILaunchScreen_Generation": "YES",
@@ -85,8 +85,8 @@
         "LD_RUNPATH_SEARCH_PATHS": "@executable_path/Frameworks",
         "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "@executable_path/../Frameworks",
         "MARKETING_VERSION": "0.1.0", // x-release-please-version
-        "PRODUCT_BUNDLE_IDENTIFIER": "dev.paseoswift.client",
-        "PRODUCT_NAME": "$(TARGET_NAME)",
+        "PRODUCT_BUNDLE_IDENTIFIER": "design.precioso.garbeo",
+        "PRODUCT_NAME": "Garbeo",
         "SDKROOT": "auto",
         "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator macosx",
         "SUPPORTS_MACCATALYST": "NO",

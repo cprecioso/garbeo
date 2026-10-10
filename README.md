@@ -1,4 +1,4 @@
-# Paseo Swift
+# Garbeo
 
 A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic development environment. It connects to a Paseo daemon over its WebSocket protocol, either directly or through the Paseo relay with end-to-end encryption.
 
@@ -50,7 +50,6 @@ Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
 Tests/PaseoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter
 Tests/PaseoSyntaxTests/  every grammar downloads and highlights a sample; precedence, injections, diffs, language detection
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
-Scripts/build-dmg.sh     release DMG (see [Releases](#releases))
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
 App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
 App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner
@@ -122,9 +121,7 @@ The write tests create agents. When the daemon creates a workspace for them, cle
 
 ## Releases
 
-[release-please](https://github.com/googleapis/release-please) keeps a release PR open on `main`, built from [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`; with squash merges, the PR title). Merging it bumps `MARKETING_VERSION` in the project (the line marked `x-release-please-version`), tags the release, and attaches a DMG (`.github/workflows/cd.yaml`). The DMG is built by `Scripts/build-dmg.sh` on the `xcode-27` runner (locally it writes `build/PaseoSwift-<version>.dmg`); running the Build DMG workflow by hand uploads it as an artifact instead.
-
-The app is ad-hoc signed and not notarized, so macOS blocks it on first launch. Allow it under System Settings → Privacy & Security → Open Anyway, or run `xattr -dr com.apple.quarantine /Applications/PaseoSwift.app`.
+[release-please](https://github.com/googleapis/release-please) keeps a release PR open on `main`, built from [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`; with squash merges, the PR title). Merging it bumps `MARKETING_VERSION` in the project (the line marked `x-release-please-version`) and tags the release (`.github/workflows/cd.yaml`).
 
 ## Protocol notes
 

@@ -461,7 +461,7 @@ final class AppModel {
         await perform {
             try await $0.respondToPermission(
                 agentId: agentId, permissionId: request.id, allow: allow, actionId: actionId,
-                message: allow ? nil : "Denied from Paseo Swift")
+                message: allow ? nil : "Denied from Garbeo")
         }
         permissions[agentId]?.removeAll { $0.id == request.id }
     }

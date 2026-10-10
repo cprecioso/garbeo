@@ -39,7 +39,7 @@ struct SidebarView: View {
         }
         .searchable(text: $search, placement: .sidebar, prompt: searchPrompt)
         .safeAreaInset(edge: .bottom, spacing: 0) { ConnectionFooter() }
-        .navigationTitle(model.serverInfo?.hostname ?? "Paseo")
+        .navigationTitle(model.serverInfo?.hostname ?? "Garbeo")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

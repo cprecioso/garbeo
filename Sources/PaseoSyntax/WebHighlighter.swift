@@ -2,7 +2,7 @@ import Foundation
 import os
 import WebKit
 
-private let log = Logger(subsystem: "dev.paseoswift.client", category: "syntax")
+private let log = Logger(subsystem: "design.precioso.garbeo", category: "syntax")
 
 /// Highlights with tree-sitter grammars compiled to wasm, in web-tree-sitter (`Web/`) inside a `WebPage` that's never
 /// shown. iOS doesn't allow JIT in the app process, but WebKit's own web content process has it, so the grammars run
