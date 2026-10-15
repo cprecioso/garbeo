@@ -59,9 +59,10 @@ private struct SyntaxCodeBlock: View {
 
     @ViewBuilder private var label: some View {
         if let request, !unavailable {
-            // Rendered through Textual so it takes part in the document's text selection.
+            // Overflow makes the block one selection region; InlineText's own would hide its highlight.
             InlineText(request.text, parser: Prehighlighted(string: highlighted))
                 .id(highlighted != nil)
+                .textual.textSelection(.disabled)
         } else {
             configuration.label
         }
