@@ -96,6 +96,7 @@
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_FILE": "Info.plist",
         "INFOPLIST_KEY_CFBundleDisplayName": "Garbeo",
+        "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption": "NO",
         "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.developer-tools",
         "INFOPLIST_KEY_NSCameraUsageDescription": "Garbeo uses the camera to scan the pairing QR code shown by your Paseo daemon.",
         "INFOPLIST_KEY_NSLocalNetworkUsageDescription": "Garbeo connects to the Paseo daemon running on your network.",
