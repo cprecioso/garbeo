@@ -1,3 +1,9 @@
+[tools."github:sparkle-project/Sparkle"]
+version = "2.10.0"
+asset_pattern = "Sparkle-for-Swift-Package-Manager.zip"
+bin_path = "bin"
+os = ["macos"]
+
 [tasks.build]
 description = "Build the download site from the notarized Developer ID app, into dist/"
 depends = ["//App:developer_id:mac"]

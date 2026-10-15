@@ -28,11 +28,15 @@ jobs:
 
     permissions:
       contents: read
+      pages: read
 
     steps:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v5
+
+      - id: pages
+        uses: actions/configure-pages@v6
 
       - uses: webfactory/ssh-agent@v0.10.0
         with:
@@ -51,6 +55,7 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
         run: mise run //web:build
 
       - uses: actions/upload-pages-artifact@v5
