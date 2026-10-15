@@ -110,11 +110,13 @@ platform :mac do
 
   desc "Archive, export and notarize a Developer ID .app for direct download"
   lane :developer_id do
+    # API keys can't use Apple's cloud-managed Developer ID certificate, so sign with the one stored in match
+    match(**MATCH_OPTIONS, type: "developer_id", readonly: true) if is_ci
     app = archive_and_export(
       platform: "macOS",
       artifact: "Garbeo.app",
       build_dir: File.join(BUILD_DIR, "developer-id"),
-      export_options: { method: "developer-id", destination: "export", signingStyle: "automatic" }
+      export_options: { method: "developer-id", destination: "export", signingStyle: "manual", signingCertificate: "Developer ID Application" }
     )
     notarize(package: app)
     app
