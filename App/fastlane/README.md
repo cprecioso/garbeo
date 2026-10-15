@@ -63,10 +63,10 @@ Archive and export an App Store .pkg
 
 Push a new beta build to TestFlight
 
-### mac developer_id
+### mac nightly
 
 ```sh
-[bundle exec] fastlane mac developer_id
+[bundle exec] fastlane mac nightly
 ```
 
 Archive, export and notarize a Developer ID .app for direct download

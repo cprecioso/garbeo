@@ -23,7 +23,7 @@ rm -rf "$out"
 mkdir -p "$out"
 ditto -c -k --sequesterRsrc --keepParent "$app" "$out/Garbeo.zip"
 for rendition in Default Dark; do
-  "$ictool" "$web/../App/Resources/Garbeo.icon" --export-image --output-file "$out/icon-$rendition.png" \
+  "$ictool" "$web/../App/Resources/GarbeoNightly.icon" --export-image --output-file "$out/icon-$rendition.png" \
     --platform macOS --rendition "$rendition" --width 128 --height 128 --scale 2 >/dev/null
 done
 sed -e "s|{{VERSION}}|$version|g" \

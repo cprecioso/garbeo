@@ -3,7 +3,7 @@ import Combine
 import Sparkle
 import SwiftUI
 
-/// Updates Developer ID builds from the download site's appcast. App Store builds update through the App Store.
+/// Updates nightly builds from the download site's appcast. App Store builds update through the App Store.
 @MainActor
 final class SoftwareUpdater: ObservableObject {
     @Published private(set) var canCheckForUpdates = false

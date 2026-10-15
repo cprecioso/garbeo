@@ -1,0 +1,8 @@
+// A Release build for direct download, signed with Developer ID, which updates itself with Sparkle
+#include "Release.xcconfig"
+
+APP_DISPLAY_NAME = Garbeo (Nightly)
+APP_ICON_NAME = GarbeoNightly
+CODE_SIGN_ENTITLEMENTS = Garbeo/GarbeoNightly.entitlements
+EXCLUDED_SOURCE_FILE_NAMES =
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = SPARKLE $(inherited)

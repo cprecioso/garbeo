@@ -1,5 +1,12 @@
 #include "Version.xcconfig"
 
+APP_DISPLAY_NAME = Garbeo
+APP_ICON_NAME = Garbeo
+// PRODUCT_NAME is APP_DISPLAY_NAME so it becomes CFBundleName (the macOS menu bar name), but the app's files and
+// module keep the plain name
+WRAPPER_NAME = Garbeo.app
+EXECUTABLE_NAME = Garbeo
+PRODUCT_MODULE_NAME = Garbeo
 CODE_SIGN_ENTITLEMENTS = Garbeo/Garbeo.entitlements
-// Sparkle is only for direct downloads (DeveloperID.xcconfig); the App Store doesn't allow it
+// Sparkle is only for direct downloads (Nightly.xcconfig); the App Store doesn't allow it
 EXCLUDED_SOURCE_FILE_NAMES = Sparkle.xcframework Sparkle.framework

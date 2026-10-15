@@ -36,6 +36,6 @@ vars = { lane = "ios build"}
 extends = "fastlane"
 vars = { lane = "ios beta"}
 
-[tasks."developer_id:mac"]
+[tasks."nightly:mac"]
 extends = "fastlane"
-vars = { lane = "mac developer_id"}
+vars = { lane = "mac nightly"}

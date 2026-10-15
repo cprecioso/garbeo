@@ -5,6 +5,6 @@ bin_path = "bin"
 os = ["macos"]
 
 [tasks.build]
-description = "Build the download site from the notarized Developer ID app, into dist/"
-depends = ["//App:developer_id:mac"]
-run = "./build.sh ../App/build/developer-id/Garbeo.app dist"
+description = "Build the download site from the notarized nightly app, into dist/"
+depends = ["//App:nightly:mac"]
+run = "./build.sh ../App/build/nightly/Garbeo.app dist"

@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # The Developer ID build number is the commit count
+          # The nightly build number is the commit count
           fetch-depth: 0
 
       - uses: jdx/mise-action@v5

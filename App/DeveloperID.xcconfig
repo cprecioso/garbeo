@@ -1,6 +1,0 @@
-// A Release build for direct download, which updates itself with Sparkle
-#include "Release.xcconfig"
-
-CODE_SIGN_ENTITLEMENTS = Garbeo/GarbeoDeveloperID.entitlements
-EXCLUDED_SOURCE_FILE_NAMES =
-SWIFT_ACTIVE_COMPILATION_CONDITIONS = SPARKLE $(inherited)

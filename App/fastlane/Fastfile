@@ -63,7 +63,7 @@ APP_STORE_EXPORT_OPTIONS = {
 
 # gym can't read the Xcode 27 project.xcproj format, so call xcodebuild directly
 # https://github.com/CocoaPods/Xcodeproj/issues/1052
-def archive_and_export(platform:, artifact:, build_dir: File.join(BUILD_DIR, platform), configuration: "Release", export_options: APP_STORE_EXPORT_OPTIONS)
+def archive_and_export(platform:, extension:, build_dir: File.join(BUILD_DIR, platform), configuration: "Release", export_options: APP_STORE_EXPORT_OPTIONS)
   sh("rm", "-rf", build_dir)
   match(**MATCH_OPTIONS, readonly: true) if is_ci
   xcarchive(
@@ -80,46 +80,49 @@ def archive_and_export(platform:, artifact:, build_dir: File.join(BUILD_DIR, pla
     export_options_plist: export_options.dup,
     xcargs: xcodebuild_args
   )
-  File.join(build_dir, artifact)
+  # Exports can be named after PRODUCT_NAME, which has the configuration's suffix, so find them by extension
+  Dir[File.join(build_dir, "*.#{extension}")].fetch(0)
 end
 
 platform :ios do
   desc "Archive and export an App Store .ipa"
   lane :build do
-    archive_and_export(platform: "iOS", artifact: "Garbeo.ipa")
+    archive_and_export(platform: "iOS", extension: "ipa")
   end
 
   desc "Push a new beta build to TestFlight"
   lane :beta do
     bump_build_number
-    upload_to_testflight(ipa: build, skip_waiting_for_build_processing: is_ci)
+    ipa = archive_and_export(platform: "iOS", extension: "ipa", configuration: "Beta")
+    upload_to_testflight(ipa: ipa, skip_waiting_for_build_processing: is_ci)
   end
 end
 
 platform :mac do
   desc "Archive and export an App Store .pkg"
   lane :build do
-    archive_and_export(platform: "macOS", artifact: "Garbeo.pkg")
+    archive_and_export(platform: "macOS", extension: "pkg")
   end
 
   desc "Push a new beta build to TestFlight"
   lane :beta do
     bump_build_number
-    upload_to_testflight(pkg: build, app_platform: "osx", skip_waiting_for_build_processing: is_ci)
+    pkg = archive_and_export(platform: "macOS", extension: "pkg", configuration: "Beta")
+    upload_to_testflight(pkg: pkg, app_platform: "osx", skip_waiting_for_build_processing: is_ci)
   end
 
   desc "Archive, export and notarize a Developer ID .app for direct download"
-  lane :developer_id do
+  lane :nightly do
     # Sparkle offers updates by build number, and these builds never reach TestFlight to bump it
     update_xcconfig_value(path: VERSION_XCCONFIG, name: "CURRENT_PROJECT_VERSION", value: number_of_commits.to_s)
     # API keys can't use Apple's cloud-managed Developer ID certificate, so sign with the one stored in match
     match(**MATCH_OPTIONS, type: "developer_id", readonly: true) if is_ci
     app = archive_and_export(
       platform: "macOS",
-      artifact: "Garbeo.app",
-      build_dir: File.join(BUILD_DIR, "developer-id"),
+      extension: "app",
+      build_dir: File.join(BUILD_DIR, "nightly"),
       # The only configuration that includes Sparkle, which the App Store doesn't allow
-      configuration: "DeveloperID",
+      configuration: "Nightly",
       export_options: { method: "developer-id", destination: "export", signingStyle: "manual", signingCertificate: "Developer ID Application" }
     )
     notarize(package: app)
