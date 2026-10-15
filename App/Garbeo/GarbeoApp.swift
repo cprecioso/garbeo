@@ -98,6 +98,7 @@ struct RootView: View {
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var showingNewAgent = false
+    @State private var showingNewWorkspace = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     #if os(macOS)
     @State private var workspaceTabs = WorkspaceTabsRegistry()
@@ -108,7 +109,7 @@ struct MainView: View {
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(showingNewAgent: $showingNewAgent)
+            SidebarView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             #if os(macOS)
@@ -126,7 +127,7 @@ struct MainView: View {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
-                EmptyDetailView(showingNewAgent: $showingNewAgent)
+                EmptyDetailView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
             }
             #else
             if let pane = model.plugins.activePane, sizeClass != .compact {
@@ -138,12 +139,15 @@ struct MainView: View {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
-                EmptyDetailView(showingNewAgent: $showingNewAgent)
+                EmptyDetailView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
             }
             #endif
         }
         .sheet(isPresented: $showingNewAgent) {
             NewAgentView()
+        }
+        .sheet(isPresented: $showingNewWorkspace) {
+            NewWorkspaceView()
         }
         #if os(iOS)
         // Compact iPhone layouts show the sidebar alone, so plugin panes open as a sheet there.
@@ -165,6 +169,7 @@ struct MainView: View {
 struct EmptyDetailView: View {
     @Environment(AppModel.self) private var model
     @Binding var showingNewAgent: Bool
+    @Binding var showingNewWorkspace: Bool
 
     var body: some View {
         ContentUnavailableView {
@@ -178,6 +183,7 @@ struct EmptyDetailView: View {
         } actions: {
             Button("New Agent") { showingNewAgent = true }
                 .buttonStyle(.borderedProminent)
+            Button("New Workspace") { showingNewWorkspace = true }
         }
     }
 }

@@ -25,6 +25,9 @@ struct ProjectGroup: Identifiable {
     var id: String
     var name: String
     var workspaces: [Workspace]
+
+    /// The repository root, where new worktrees branch from.
+    var rootPath: String? { workspaces.lazy.compactMap(\.projectRootPath).first ?? workspaces.first?.workspaceDirectory }
 }
 
 /// Owns the daemon connection and the replicated directory (workspaces, agents) plus live
@@ -35,6 +38,8 @@ final class AppModel {
     private(set) var workspaces: [String: Workspace] = [:]
     private(set) var agents: [String: Agent] = [:]
     private(set) var permissions: [String: [PermissionRequest]] = [:]
+    /// Setup script progress by workspace ID, see `loadSetupStatus(for:)`.
+    private(set) var setups: [String: WorkspaceSetupSnapshot] = [:]
     /// Live timelines of the agents currently shown, see `showTimeline(_:viewer:)`.
     private(set) var timelines = TimelineRegistry()
     /// The single selection driving the detail column. Terminal selection made by
@@ -184,6 +189,7 @@ final class AppModel {
         workspaces = [:]
         agents = [:]
         permissions = [:]
+        setups = [:]
         timelines = TimelineRegistry()
         subscriptionSync.desired = []
         subscriptionSync.reset()
@@ -246,6 +252,7 @@ final class AppModel {
         let pluginEvents = await client.serverInfo?.supportsPlugins == true ? PluginEvents.subscription : []
         try await client.subscribeToSessionEvents([
             "agent_permission_request", "agent_permission_resolved", "agent_attention_required",
+            "workspace_setup_progress",
         ] + pluginEvents)
         // Terminal lists aren't needed to show the sidebar; don't hold up the connection for them.
         Task {
@@ -314,6 +321,7 @@ final class AppModel {
             Task { await terminals.observe(workspace) }
         case .workspaceUpdate(.remove(let id)):
             workspaces[id] = nil
+            setups[id] = nil
             terminals.forget(workspaceId: id)
         case .terminalsChanged(let change):
             terminals.apply(change)
@@ -330,6 +338,8 @@ final class AppModel {
             if connection.isConnected { connection = .connected(info) }
         case .pluginStatus(let status):
             plugins.handle(status)
+        case .workspaceSetupProgress(let progress):
+            setups[progress.workspaceId] = progress.snapshot
         case .disconnected(let reason):
             client = nil
             plugins.detach(keepPane: true)
@@ -486,6 +496,51 @@ final class AppModel {
         let agent = try await client.createAgent(options)
         agents[agent.id] = agent
         selection = .agent(agent.id)
+    }
+
+    /// Creates a worktree workspace and selects it. When `firstAgent` is given, also starts an agent
+    /// there and selects that instead. Throws only if the worktree wasn't created.
+    func createWorkspace(
+        _ options: CreateWorktreeOptions,
+        firstAgent: ((Workspace) -> DaemonClient.CreateAgentOptions)? = nil
+    ) async throws {
+        guard let client else { throw PaseoError.disconnected }
+        let response = try await client.createWorktree(options)
+        guard let workspace = response.workspace else { return }
+        workspaces[workspace.id] = workspace
+        Task { await terminals.observe(workspace) }
+        selection = .workspace(workspace.id)
+        Task { await loadSetupStatus(for: workspace.id) }
+        guard let firstAgent else { return }
+        do {
+            try await createAgent(firstAgent(workspace))
+        } catch {
+            lastError = "The workspace was created, but its agent could not start: \(error.localizedDescription)"
+        }
+    }
+
+    /// Fetches a workspace's setup progress unless it is already known. Finished setups from before
+    /// are left out, so only progress seen live keeps showing once done.
+    func loadSetupStatus(for workspaceId: String) async {
+        guard let client, setups[workspaceId] == nil,
+              let snapshot = try? await client.workspaceSetupStatus(workspaceId: workspaceId),
+              setups[workspaceId] == nil, snapshot.status != .completed
+        else { return }
+        setups[workspaceId] = snapshot
+    }
+
+    func dismissSetupStatus(for workspaceId: String) {
+        setups[workspaceId] = nil
+    }
+
+    /// Approves a setup blocked on code from a fork pull request, and runs it.
+    func runSetup(for workspaceId: String) async {
+        await perform { try await $0.runWorkspaceSetup(workspaceId: workspaceId) }
+    }
+
+    func branchSuggestions(cwd: String, query: String) async throws -> [BranchSuggestion] {
+        guard let client else { throw PaseoError.disconnected }
+        return try await client.branchSuggestions(cwd: cwd, query: query)
     }
 
     private func perform(_ action: (DaemonClient) async throws -> Void) async {

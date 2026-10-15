@@ -4,6 +4,7 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
     @Binding var showingNewAgent: Bool
+    @Binding var showingNewWorkspace: Bool
     @State private var search = ""
     #if os(iOS)
     @State private var showingCredits = false
@@ -51,6 +52,15 @@ struct SidebarView: View {
                     Label("New Agent", systemImage: "square.and.pencil")
                 }
                 .keyboardShortcut("n")
+                .disabled(!model.connection.isConnected)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingNewWorkspace = true
+                } label: {
+                    Label("New Workspace", systemImage: "folder.badge.plus")
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(!model.connection.isConnected)
             }
             #if os(iOS)
@@ -134,9 +144,19 @@ private struct WorkspaceSection: View {
     let agents: [Agent]
     let terminals: [TerminalInfo]
     @State private var isExpanded = true
+    @State private var showingSetup = false
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
+            if let setup = model.setups[workspace.id], setup.isWorthShowing {
+                Button { showingSetup = true } label: { WorkspaceSetupSummary(setup: setup) }
+                    .foregroundStyle(.primary)
+                    .swipeActions {
+                        if setup.status != .running {
+                            Button("Dismiss") { model.dismissSetupStatus(for: workspace.id) }
+                        }
+                    }
+            }
             if agents.isEmpty && terminals.isEmpty {
                 Text("No agents").font(.caption).foregroundStyle(.tertiary)
             }
@@ -145,6 +165,8 @@ private struct WorkspaceSection: View {
         } label: {
             WorkspaceLabel(workspace: workspace)
         }
+        .sheet(isPresented: $showingSetup) { WorkspaceSetupView(workspace: workspace) }
+        .task { await model.loadSetupStatus(for: workspace.id) }
     }
 }
 

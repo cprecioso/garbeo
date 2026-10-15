@@ -36,6 +36,7 @@ struct WorkspaceView: View {
             EmptyWorkspacePane(workspace: workspace, tabs: tabs, paneId: paneId, showingNewAgent: $showingNewAgent)
                 .environment(model)
         }
+        .safeAreaInset(edge: .top, spacing: 0) { WorkspaceSetupBanner(workspace: workspace) }
         .navigationTitle(workspace.displayName)
         .navigationSubtitle((workspace.workspaceDirectory as NSString).abbreviatingWithTildeInPath)
         .toolbar {
@@ -71,6 +72,7 @@ struct WorkspaceView: View {
         }
         .task {
             tabs.start()
+            Task { await model.loadSetupStatus(for: workspace.id) }
             #if DEBUG
             DebugSnapshot.describeWorkspace = { [tabs] in tabs.debugDescription }
             await tabs.debugSplitIfRequested()

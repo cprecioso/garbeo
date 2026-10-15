@@ -36,6 +36,7 @@ public enum DaemonEvent: Sendable {
     case serverInfo(ServerInfo)
     case terminalsChanged(TerminalsChanged)
     case pluginStatus(PluginStatusPayload)
+    case workspaceSetupProgress(WorkspaceSetupProgress)
     case disconnected(String?)
 }
 
@@ -96,6 +97,7 @@ public actor DaemonClient {
         "timeline_notifications": true,
         "all_providers": true,
         "terminal_reflowable_snapshot": true,
+        "workspace_setup_blocked": true,
     ]
 
     /// Whether this client reaches the daemon directly or through the E2EE relay.
@@ -295,6 +297,7 @@ public actor DaemonClient {
         case "agent_permission_resolved": decode(AgentPermissionResolvedPayload.self).map(DaemonEvent.permissionResolved)
         case "status" where message.payload?.status == "server_info": decode(ServerInfo.self).map(DaemonEvent.serverInfo)
         case "terminals_changed": decode(TerminalsChanged.self).map(DaemonEvent.terminalsChanged)
+        case "workspace_setup_progress": decode(WorkspaceSetupProgress.self).map(DaemonEvent.workspaceSetupProgress)
         case "status" where message.payload?.status?.hasPrefix("plugin_") == true:
             decode(PluginStatusPayload.self).map(DaemonEvent.pluginStatus)
         default: nil
