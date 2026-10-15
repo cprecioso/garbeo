@@ -10,5 +10,7 @@ App/fastlane/report.xml
 App/fastlane/Preview.html
 App/fastlane/screenshots/
 App/fastlane/test_output/
+App/build/
 
-mise.local.toml
+mise.local.*
+fnox.local.toml
