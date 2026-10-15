@@ -36,38 +36,13 @@ end
 
 # CI runners start with an empty keychain, so without this Xcode creates a new development certificate on every run.
 # Xcode still manages profiles; match only carries the certificate's private key between runs.
+# The certificates repo renews it on its own schedule.
 MATCH_OPTIONS = {
   git_url: "git@github.com:cprecioso/appstore-certificates.git",
   git_branch: "main",
   type: "development",
   skip_provisioning_profiles: true
 }
-
-# match only replaces expired certificates, so renew early enough that a monthly run is always in time
-CERTIFICATE_RENEWAL_WINDOW = 45 * 24 * 60 * 60
-
-desc "Create the CI development certificate, or replace it if it expires soon or was revoked"
-lane :renew_certificate do
-  Dir.mktmpdir do |dir|
-    sh("git", "clone", "--quiet", "--depth", "1", "--branch", MATCH_OPTIONS[:git_branch], MATCH_OPTIONS[:git_url], dir)
-
-    # match names stored certificates after their Developer Portal ID
-    portal_certificates = Spaceship::ConnectAPI::Certificate.all.to_h { |certificate| [certificate.id, certificate] }
-    stale = Dir[File.join(dir, "certs", "development", "*.cer")].select do |path|
-      certificate = portal_certificates[File.basename(path, ".cer")]
-      certificate.nil? || Time.parse(certificate.expiration_date) < Time.now + CERTIFICATE_RENEWAL_WINDOW
-    end
-
-    unless stale.empty?
-      stale_files = stale.flat_map { |path| [path, path.sub(/\.cer\z/, ".p12")] }.select { |path| File.exist?(path) }
-      sh("git", "-C", dir, "rm", "--quiet", *stale_files)
-      sh("git", "-C", dir, "commit", "--quiet", "--message", "[fastlane] Remove expiring or revoked development certificates")
-      sh("git", "-C", dir, "push", "--quiet")
-    end
-  end
-
-  match(**MATCH_OPTIONS, platform: "ios", readonly: false)
-end
 
 desc "Set the build number to one above the latest iOS or macOS TestFlight build"
 lane :bump_build_number do

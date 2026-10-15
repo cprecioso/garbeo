@@ -12,9 +12,8 @@ on:
 
 name: Beta
 
-# Shared with the certificate renewal, so a beta never fetches a certificate mid-replacement
 concurrency:
-  group: "signing"
+  group: "beta"
   cancel-in-progress: false
 
 jobs:
