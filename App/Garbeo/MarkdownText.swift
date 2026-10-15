@@ -13,11 +13,24 @@ struct MarkdownText: View {
 
     var body: some View {
         StructuredText(markdown: text)
-            // Closer to the view than the GitHub style, so it replaces that style's code blocks.
+            // Closer to the view than the GitHub style, so these replace that style's inline style and code blocks.
             .textual.codeBlockStyle(SyntaxCodeBlockStyle())
+            .textual.inlineStyle(.translucentCode)
             .textual.structuredTextStyle(.gitHub)
             .textual.textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension InlineStyle {
+    /// Textual's GitHub inline style, but inline code's background is translucent. The selection highlight is drawn
+    /// behind the text, so the GitHub style's opaque background would hide it.
+    fileprivate static var translucentCode: InlineStyle {
+        InlineStyle.gitHub.code(
+            .monospaced,
+            .fontScale(0.85),
+            .backgroundColor(DynamicColor(light: .black.opacity(0.04), dark: .white.opacity(0.08)))
+        )
     }
 }
 
