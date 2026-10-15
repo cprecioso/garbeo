@@ -31,7 +31,7 @@ final class HostStore {
     private static let hostsKey = "savedHosts"
     private static let currentKey = "currentHostId"
     private static let legacyEndpointKey = "endpointURL"
-    private static let relayKeyService = "PaseoSwift.relay-daemon-key"
+    private static let relayKeyService = "Garbeo.relay-daemon-key"
 
     private(set) var hosts: [SavedHost] = []
     private(set) var currentId: String?

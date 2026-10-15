@@ -171,8 +171,8 @@ struct TerminalTab: WorkspaceTabKind {
     /// Focusing claims the PTY size, so only the terminal the user just selected takes focus.
     @MainActor private static func focusOnAppear(_ terminalId: String, in model: AppModel) -> Bool {
         #if DEBUG
-        // Development aid: `-PaseoTerminalPassive YES` never focuses (no size claim on a live daemon).
-        if UserDefaults.standard.bool(forKey: "PaseoTerminalPassive") { return false }
+        // Development aid: `-GarbeoTerminalPassive YES` never focuses (no size claim on a live daemon).
+        if UserDefaults.standard.bool(forKey: "GarbeoTerminalPassive") { return false }
         #endif
         return model.selection == .terminal(terminalId)
     }

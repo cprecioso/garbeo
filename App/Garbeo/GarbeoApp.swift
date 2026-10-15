@@ -2,7 +2,7 @@ import PaseoKit
 import SwiftUI
 
 @main
-struct PaseoSwiftApp: App {
+struct GarbeoApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {

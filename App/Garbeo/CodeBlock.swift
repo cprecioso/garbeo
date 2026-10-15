@@ -1,4 +1,4 @@
-import PaseoSyntax
+import GarbeoSyntax
 import SwiftUI
 
 /// Monospaced code in a horizontally scrolling box, highlighted with tree-sitter when `language` is known. Diffs get

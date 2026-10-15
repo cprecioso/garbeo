@@ -228,7 +228,7 @@ enum Grammars {
 /// `injections.scm`), so each is fetched once.
 actor GrammarDownloads {
     static let shared = GrammarDownloads(directory: URL.cachesDirectory
-        .appending(path: Bundle.main.bundleIdentifier ?? "PaseoSyntax")
+        .appending(path: Bundle.main.bundleIdentifier ?? "GarbeoSyntax")
         .appending(path: "Grammars"))
 
     /// How long a failed download is remembered before it's tried again.

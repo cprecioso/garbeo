@@ -4,7 +4,7 @@ import { Language, Parser, Query } from './web-tree-sitter.js';
 const ready = Parser.init();
 const grammars = new Map();
 
-window.paseoSyntax = {
+window.garbeoSyntax = {
   // Loads a grammar's wasm (served by the page's scheme handler) and compiles its queries.
   async load(name, wasmURL, highlights, injections) {
     await ready;

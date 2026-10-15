@@ -1,5 +1,5 @@
 {
-  "name": "paseo-swift-plugin-host",
+  "name": "garbeo-plugin-host",
   "private": true,
   "description": "JS runtime that runs Paseo plugin client bundles inside the app's WKWebView panes",
   "type": "module",

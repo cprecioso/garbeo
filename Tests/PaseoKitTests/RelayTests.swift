@@ -409,7 +409,7 @@ struct LiveRelayTests {
     @Test(.timeLimit(.minutes(1))) func connectsThroughRelay() async throws {
         let env = ProcessInfo.processInfo.environment
         let endpoint = try DaemonEndpoint.fromPairingLink(env["PASEO_LIVE_PAIRING_URL"]!, password: env["PASEO_PASSWORD"])
-        let client = DaemonClient(endpoint: endpoint, clientId: "paseo-swift-relay-tests")
+        let client = DaemonClient(endpoint: endpoint, clientId: "garbeo-relay-tests")
         let info = try await client.connect()
         let relay = try #require(try endpoint.relayConnection())
         #expect(info.serverId == relay.serverId)

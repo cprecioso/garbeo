@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import Testing
-@testable import PaseoTerminal
+@testable import GarbeoTerminal
 import SwiftTerm
 
 /// Pins SwiftTerm behavior that `TerminalSession` depends on, so a version bump that changes it fails here.

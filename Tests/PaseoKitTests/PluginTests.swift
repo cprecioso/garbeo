@@ -60,7 +60,7 @@ struct LivePluginTests {
         let env = ProcessInfo.processInfo.environment
         let client = DaemonClient(
             endpoint: DaemonEndpoint(url: env["PASEO_LIVE_URL"]!, password: env["PASEO_PASSWORD"]),
-            clientId: "paseo-swift-plugin-tests")
+            clientId: "garbeo-plugin-tests")
         let info = try await client.connect()
         defer { Task { await client.disconnect() } }
         guard info.supportsPlugins else { return }

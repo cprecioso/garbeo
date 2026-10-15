@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PaseoSyntax
+@testable import GarbeoSyntax
 
 @Suite struct SyntaxTests {
     /// The text each span covers, with its capture.

@@ -74,7 +74,7 @@ final class WebHighlighter {
         let page = try await currentPage()
         try await load(grammar, files: files, into: page)
         let result = try await page.callJavaScript(
-            "return paseoSyntax.highlight(name, code, ranges)",
+            "return garbeoSyntax.highlight(name, code, ranges)",
             arguments: ["name": grammar.name, "code": code, "ranges": ranges ?? NSNull()])
         guard let result, !(result is NSNull) else { throw GrammarNotLoaded() }
         guard let result = result as? [String: Any], let names = result["names"] as? [String],
@@ -129,7 +129,7 @@ final class WebHighlighter {
             let highlights = try String(contentsOf: files.appending(path: "highlights.scm"), encoding: .utf8)
             let injections = try String(contentsOf: files.appending(path: "injections.scm"), encoding: .utf8)
             _ = try await page.callJavaScript(
-                "await paseoSyntax.load(name, url, highlights, injections)",
+                "await garbeoSyntax.load(name, url, highlights, injections)",
                 arguments: ["name": grammar.name, "url": "/grammars/\(directory)/parser.wasm",
                             "highlights": highlights, "injections": injections])
         }
@@ -140,14 +140,14 @@ final class WebHighlighter {
 
 /// Serves the page: web-tree-sitter and its glue from the package's resources, and downloaded grammars.
 private struct PageScheme: URLSchemeHandler {
-    static let scheme = "paseo-syntax"
+    static let scheme = "garbeo-syntax"
 
     let grammars: URL
 
     private static let indexHTML = """
     <!doctype html>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src paseo-syntax: 'wasm-unsafe-eval'">
+    <meta http-equiv="Content-Security-Policy" content="default-src garbeo-syntax: 'wasm-unsafe-eval'">
     <script type="module" src="highlighter.js"></script>
     """
 

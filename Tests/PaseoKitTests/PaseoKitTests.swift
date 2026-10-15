@@ -210,7 +210,7 @@ struct LiveDaemonTests {
         let url = try #require(ProcessInfo.processInfo.environment["PASEO_LIVE_URL"])
         let client = DaemonClient(
             endpoint: DaemonEndpoint(url: url, password: ProcessInfo.processInfo.environment["PASEO_PASSWORD"]),
-            clientId: "paseo-swift-tests")
+            clientId: "garbeo-tests")
         let info = try await client.connect()
         #expect(!info.serverId.isEmpty)
 
@@ -274,7 +274,7 @@ struct LiveAgentRoundTripTests {
     }
 
     @Test(.timeLimit(.minutes(3))) func createStreamSendArchive() async throws {
-        let (client, preexisting) = try await connectedClient("paseo-swift-tests-write")
+        let (client, preexisting) = try await connectedClient("garbeo-tests-write")
         let agent = try await createAgent(client, modeId: "plan", prompt: "Reply with exactly the single word: pong. Do not use any tools.")
         print("live-write: created \(agent.id) in \(agent.workspaceId ?? "-")")
 
@@ -316,10 +316,10 @@ struct LiveAgentRoundTripTests {
     }
 
     @Test(.timeLimit(.minutes(3))) func permissionRequestIsAnswered() async throws {
-        let (client, preexisting) = try await connectedClient("paseo-swift-tests-permission")
+        let (client, preexisting) = try await connectedClient("garbeo-tests-permission")
         try await client.subscribeToSessionEvents(["agent_permission_request", "agent_permission_resolved"])
         let agent = try await createAgent(client, modeId: "default",
-            prompt: "Use the Write tool to create the file /tmp/paseo-swift-permission-check.txt containing `ok`, then reply with: done.")
+            prompt: "Use the Write tool to create the file /tmp/garbeo-permission-check.txt containing `ok`, then reply with: done.")
 
         var requested: PermissionRequest?
         var resolved = false

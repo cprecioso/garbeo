@@ -6,7 +6,7 @@ import SwiftUI
 /// and attach/exit status. Host it in any container; it attaches on appear and detaches on disappear.
 ///
 /// Recreate it (e.g. with `.id`) when the `DaemonClient` changes, such as after a reconnect.
-public struct PaseoTerminalView: View {
+public struct GarbeoTerminalView: View {
     @State private var session: TerminalSession
     @Environment(\.colorScheme) private var colorScheme
     private let focusOnAppear: Bool
@@ -155,10 +155,10 @@ final class SessionTerminalView: TerminalView, TerminalOutputSink {
     }
 
     #if DEBUG
-    /// Development aid: `-PaseoTerminalType 'echo hi\r'` types through the emulator's input path
+    /// Development aid: `-GarbeoTerminalType 'echo hi\r'` types through the emulator's input path
     /// shortly after the terminal goes live (and after its restore).
     func typeDebugInputIfRequested() {
-        guard let text = UserDefaults.standard.string(forKey: "PaseoTerminalType") else { return }
+        guard let text = UserDefaults.standard.string(forKey: "GarbeoTerminalType") else { return }
         Task { [weak self] in
             while let self, self.session.phase != .live { try? await Task.sleep(for: .milliseconds(20)) }
             try? await Task.sleep(for: .milliseconds(300))

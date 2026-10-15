@@ -1,4 +1,4 @@
-import PaseoSyntax
+import GarbeoSyntax
 import SwiftUI
 import Textual
 

@@ -3,7 +3,7 @@ import Security
 
 /// Minimal generic-password storage for daemon passwords and relay pairing keys.
 enum Keychain {
-    private static let service = "PaseoSwift.daemon-password"
+    private static let service = "Garbeo.daemon-password"
 
     static func password(for account: String) -> String? {
         secret(service: service, account: account)

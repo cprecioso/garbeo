@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PaseoSyntax
+@testable import GarbeoSyntax
 
 /// Highlights a snippet with every grammar. The first run downloads them all (into the caches directory), so it
 /// catches moved tags (hash mismatches), wasm the vendored web-tree-sitter can't load, and queries that don't compile.
@@ -59,7 +59,7 @@ import Testing
     }
 
     @Test func rejectsFilesThatDontMatchTheirHash() async throws {
-        let directory = FileManager.default.temporaryDirectory.appending(path: "PaseoSyntaxTests-\(UUID().uuidString)")
+        let directory = FileManager.default.temporaryDirectory.appending(path: "GarbeoSyntaxTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let wasm = directory.appending(path: "tree-sitter-x.wasm")

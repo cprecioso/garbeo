@@ -4,7 +4,7 @@ import Foundation
 //
 // Plugin UI is not declarative on the wire: `plugin.catalog.get.response` carries each plugin's
 // client code as a compiled CommonJS bundle, and contributions (screens, panels, sidebar items)
-// are only known after a host runs it. See App/PaseoSwift/Plugins and PluginHost/.
+// are only known after a host runs it. See App/Garbeo/Plugins and PluginHost/.
 
 public enum PluginStatus: Sendable, Hashable {
     case running, disabled, failed

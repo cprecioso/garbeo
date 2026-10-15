@@ -1,5 +1,5 @@
 import PaseoKit
-import PaseoTerminal
+import GarbeoTerminal
 import SwiftUI
 
 struct TerminalRow: View {
@@ -50,7 +50,7 @@ private struct TerminalActivityIndicator: View {
     }
 }
 
-/// A terminal: the reusable `PaseoTerminalView` plus new/kill actions. `.window` (detail column)
+/// A terminal: the reusable `GarbeoTerminalView` plus new/kill actions. `.window` (detail column)
 /// puts them in the toolbar; `.pane` (a macOS workspace tab) draws a compact header instead.
 struct TerminalDetailView: View {
     enum Chrome { case window, pane }
@@ -117,7 +117,7 @@ struct TerminalDetailView: View {
 
     @ViewBuilder private var emulator: some View {
         if let client = model.client {
-            PaseoTerminalView(client: client, terminalId: terminal.id, focusOnAppear: focusOnAppear)
+            GarbeoTerminalView(client: client, terminalId: terminal.id, focusOnAppear: focusOnAppear)
                 // A reconnect replaces the client; a fresh view re-attaches and restores the screen.
                 .id(ObjectIdentifier(client))
         } else {

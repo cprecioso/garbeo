@@ -29,8 +29,8 @@
     },
   ],
   "files": [
-    { "kind": "folder", "path": "Resources", "target-membership": [ "PaseoSwift" ] },
-    { "kind": "folder", "path": "PaseoSwift", "target-membership": [ "PaseoSwift" ] },
+    { "kind": "folder", "path": "Resources", "target-membership": [ "Garbeo" ] },
+    { "kind": "folder", "path": "Garbeo", "target-membership": [ "Garbeo" ] },
     { "path": "Info.plist" },
     {
       "kind": "group",
@@ -42,7 +42,7 @@
   ],
   "targets": [
     {
-      "name": "PaseoSwift",
+      "name": "Garbeo",
       "id": "AB12CD34EF56000000000013",
       "product": "Products/Garbeo.app",
       "product-type": "application",
@@ -56,10 +56,10 @@
           "product-name": "PaseoKit",
           "build-phase": { "build-phase": "frameworks" },
         }, {
-          "product-name": "PaseoSyntax",
+          "product-name": "GarbeoSyntax",
           "build-phase": { "build-phase": "frameworks" },
         }, {
-          "product-name": "PaseoTerminal",
+          "product-name": "GarbeoTerminal",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "bonsplit",
@@ -74,7 +74,7 @@
       "build-settings": {
         "ASSETCATALOG_COMPILER_APPICON_NAME": "Garbeo",
         "AUTOMATION_APPLE_EVENTS": "NO",
-        "CODE_SIGN_ENTITLEMENTS": "PaseoSwift/PaseoSwift.entitlements",
+        "CODE_SIGN_ENTITLEMENTS": "Garbeo/Garbeo.entitlements",
         "CODE_SIGN_IDENTITY": "Apple Development",
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "1",

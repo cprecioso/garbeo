@@ -1,5 +1,5 @@
 import PaseoKit
-import PaseoSyntax
+import GarbeoSyntax
 import SwiftUI
 
 struct AgentDetailView: View {

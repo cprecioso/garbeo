@@ -21,8 +21,8 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 ## Layout
 
 ```
-Package.swift            PaseoKit + PaseoTerminal + PaseoSyntax libraries (PaseoKit depends on swift-sodium, PaseoTerminal on SwiftTerm,
-                         PaseoSyntax on WebKit only)
+Package.swift            PaseoKit + GarbeoTerminal + GarbeoSyntax libraries (PaseoKit depends on swift-sodium, GarbeoTerminal on SwiftTerm,
+                         GarbeoSyntax on WebKit only)
 Sources/PaseoKit/
   DaemonClient.swift     hello handshake, requestId correlation, subscriptions, ping, binary frames
   DaemonTransport.swift  transport protocol + plain WebSocket transport; endpoint → transport selection
@@ -35,8 +35,8 @@ Sources/PaseoKit/
   TerminalFrames.swift   terminal binary frame codec, snapshot → ANSI renderer
   Terminals.swift        terminal requests, slot-routed output streams
   Plugins.swift          plugin list/catalog/RPC requests and catalog-change events
-Sources/PaseoTerminal/   PaseoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
-Sources/PaseoSyntax/
+Sources/GarbeoTerminal/  GarbeoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
+Sources/GarbeoSyntax/
   SyntaxLanguage.swift   languages; detection from file paths and markdown fence names
   Grammars.swift         grammar table (release wasm + query files, pinned by SHA-256), download cache
   WebHighlighter.swift   hidden WebPage running the grammars in web-tree-sitter, injected languages as layers
@@ -47,12 +47,12 @@ Sources/PaseoSyntax/
 Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
   Resources/relay-vectors.json  known-answer vectors generated from the upstream TypeScript
   Fixtures/terminal-vectors.json  terminal codec vectors generated from the upstream TypeScript
-Tests/PaseoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter
-Tests/PaseoSyntaxTests/  every grammar downloads and highlights a sample; precedence, injections, diffs, language detection
+Tests/GarbeoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter
+Tests/GarbeoSyntaxTests/ every grammar downloads and highlights a sample; precedence, injections, diffs, language detection
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
-App/PaseoSwift.xcodeproj multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
-App/PaseoSwift/          views + AppModel (observable store), HostStore (saved hosts), QR scanner, credits (keep CreditsView in step with dependencies)
+App/Garbeo.xcodeproj     multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
+App/Garbeo/              views + AppModel (observable store), HostStore (saved hosts), QR scanner, credits (keep CreditsView in step with dependencies)
   Workspace/             workspace tabs: tab content model, saved layout, Bonsplit integration (macOS)
   Plugins/               PluginStore, WKWebView runtime + bridge, PluginPaneView, PluginTab, sidebar/menu entries
   PluginHost/plugin-host.js  generated JS host runtime (do not edit)
@@ -67,7 +67,7 @@ To add a tab kind (plugin webview, …), write a struct conforming to `Workspace
 
 ## Syntax highlighting
 
-`PaseoSyntax` parses with tree-sitter and colors the captures of each grammar's own `highlights.scm`: Bash, C, C++, C#, CSS, Elixir, Go, Haskell, HTML, Java, JavaScript/JSX, JSON, Julia, Kotlin, Lua, Make, Markdown, Objective-C, OCaml, Perl, PHP, Python, R, Ruby, Rust, Scala, Swift, TOML, TypeScript, TSX, XML (plists, storyboards, SVG, …), YAML and Zig. Injections are followed, so HTML `<script>`/`<style>`, JS tagged templates, Rust macro bodies and markdown fences and inline markup are highlighted in their own language.
+`GarbeoSyntax` parses with tree-sitter and colors the captures of each grammar's own `highlights.scm`: Bash, C, C++, C#, CSS, Elixir, Go, Haskell, HTML, Java, JavaScript/JSX, JSON, Julia, Kotlin, Lua, Make, Markdown, Objective-C, OCaml, Perl, PHP, Python, R, Ruby, Rust, Scala, Swift, TOML, TypeScript, TSX, XML (plists, storyboards, SVG, …), YAML and Zig. Injections are followed, so HTML `<script>`/`<style>`, JS tagged templates, Rust macro bodies and markdown fences and inline markup are highlighted in their own language.
 
 No grammar ships with the app. The first block in a language downloads its grammar's `.wasm` from the grammar's GitHub release and its query files from the repository at the same tag, checks each against the SHA-256 in `Grammars.swift`, and keeps them in the caches directory (all of them come to about 55 MB). The block stays plain until then, markdown fences keep Textual's Prism highlighting if the download fails, and a failed download is retried after a minute.
 
@@ -75,15 +75,15 @@ The wasm runs in [web-tree-sitter](https://github.com/tree-sitter/tree-sitter/tr
 
 In the app, `CodeBlock` highlights tool call bodies off the main actor and caches the result. Markdown code blocks go through a Textual `CodeBlockStyle` that renders the highlighted code with Textual's `InlineText` (so it stays part of the reply's text selection); fences in other languages keep Textual's Prism highlighting. Textual doesn't expose a code block's text, so the style reads it from `CodeBlockProxy` with `Mirror`; if a Textual update renames that property, every block falls back to Prism.
 
-To add a language: its grammar's GitHub release must include `tree-sitter-<name>.wasm`. Add a case to `SyntaxLanguage` (plus extensions and aliases), its entry in `Grammars.grammar(for:)` with each file's `shasum -a 256` (queries it inherits from a base grammar first, as C++ and TypeScript do), and a sample in `GrammarTests`. `swift test --filter PaseoSyntaxTests` downloads every grammar (once; it needs the network the first time) and highlights its sample, so it catches a moved tag, wasm web-tree-sitter can't load, and queries that don't compile. To update web-tree-sitter, replace `Sources/PaseoSyntax/Web/web-tree-sitter.{js,wasm}` with the ones in a tree-sitter release's `web-tree-sitter.tar.gz` (currently 0.27.1) and run the same tests.
+To add a language: its grammar's GitHub release must include `tree-sitter-<name>.wasm`. Add a case to `SyntaxLanguage` (plus extensions and aliases), its entry in `Grammars.grammar(for:)` with each file's `shasum -a 256` (queries it inherits from a base grammar first, as C++ and TypeScript do), and a sample in `GrammarTests`. `swift test --filter GarbeoSyntaxTests` downloads every grammar (once; it needs the network the first time) and highlights its sample, so it catches a moved tag, wasm web-tree-sitter can't load, and queries that don't compile. To update web-tree-sitter, replace `Sources/GarbeoSyntax/Web/web-tree-sitter.{js,wasm}` with the ones in a tree-sitter release's `web-tree-sitter.tar.gz` (currently 0.27.1) and run the same tests.
 
 ## Build and run
 
 ```sh
-open App/PaseoSwift.xcodeproj        # pick "My Mac" or an iOS Simulator, then Run
+open App/Garbeo.xcodeproj        # pick "My Mac" or an iOS Simulator, then Run
 
 # or from the command line
-xcodebuild -project App/PaseoSwift.xcodeproj -scheme PaseoSwift -destination 'platform=macOS' \
+xcodebuild -project App/Garbeo.xcodeproj -scheme Garbeo -destination 'platform=macOS' \
   -skipPackagePluginValidation build
 ```
 
@@ -94,7 +94,7 @@ Requires Xcode 27+, macOS 27 / iOS 27.
 ## Tests
 
 ```sh
-swift test                                      # unit tests (PaseoKit + PaseoTerminal)
+swift test                                      # unit tests (PaseoKit + GarbeoTerminal)
 PASEO_LIVE_URL=127.0.0.1:6767 swift test        # + read-only checks against a running daemon (incl. plugin list/catalog)
 PASEO_LIVE_URL=127.0.0.1:6767 PASEO_LIVE_WRITE=1 swift test   # + creates real agents (cheap model)
 ```
@@ -147,7 +147,7 @@ Relay connections (`packages/relay`, `packages/protocol/src/connection-offer.ts`
 
 Upstream Paseo has no webview contract for plugins. The daemon compiles each plugin's `index.client.tsx` into a CommonJS bundle and ships it in `plugin.catalog.get.response`; the official app `eval`s it with a `require` that hands out its own React, React Native, TanStack Query, zod and `@getpaseo/plugin` modules, then renders the contributed components in its own tree. This client does the same inside a WKWebView:
 
-- `PluginHost/` is a small JS host (React 19.1 + react-native-web + the Paseo plugin/client SDK) that ports upstream's `runPluginClientBundle`, its `require` map, providers (`QueryClientProvider`, `PaseoApiProvider`, `PluginRpcProvider`, `PluginClientStateProvider`) and the host-supplied modules (`@getpaseo/plugin/client/ui`, `/client/react-native`, `useSettings`, `useHosts`, Lucide icons by name). It is bundled into `App/PaseoSwift/PluginHost/plugin-host.js`, which is committed so the app builds without Node.
+- `PluginHost/` is a small JS host (React 19.1 + react-native-web + the Paseo plugin/client SDK) that ports upstream's `runPluginClientBundle`, its `require` map, providers (`QueryClientProvider`, `PaseoApiProvider`, `PluginRpcProvider`, `PluginClientStateProvider`) and the host-supplied modules (`@getpaseo/plugin/client/ui`, `/client/react-native`, `useSettings`, `useHosts`, Lucide icons by name). It is bundled into `App/Garbeo/PluginHost/plugin-host.js`, which is committed so the app builds without Node.
 - A hidden **registry** page per connection runs every client bundle, reports contributions (screens, panels, Command Center items, settings screens) and renders sidebar items headlessly: the rows a plugin draws with `SidebarRow` show up as native rows under **Plugins** in the sidebar, and presses run the plugin's own `onPress`.
 - Each open **pane** (`PluginPaneView`, a self-contained view any container can host) runs its own page that renders one screen or panel with the upstream props (`theme`, `host`, `layout`, `navigation`, `params` / `workspaceId` / `agentId`).
 - Bridge: pages are served from `paseo-plugin://host/` by a `WKURLSchemeHandler`; navigation anywhere else is cancelled and http(s) links open in the system browser. The init payload (bundles, target, theme from native semantic colors, workspace/agent snapshots) is injected with a `WKUserScript`; JS calls the app through a `WKScriptMessageHandlerWithReply`. `useRpc` / `ctx.rpc` go through the app's own connection as `plugin.rpc.invoke.request`. `usePaseo()` gets a real `@getpaseo/client` `PaseoApi` whose socket the app opens natively with the connection's own transport (direct or relay E2EE) and relays (the daemon rejects WebSocket upgrades from unlisted origins, which includes the custom scheme).
@@ -177,10 +177,10 @@ cd PluginHost && npm install && PASEO_SRC=/tmp/paseo-src/paseo npm run build
 - `-PaseoSelectAgent first|<agentId>` opens an agent on launch
 - `-PaseoPairingLink <url>` pairs with a relay pairing link and connects on launch
 - `-PaseoSelectTerminal first|<terminalId>|new` opens a terminal on launch (`new` creates one in the first workspace; throwaway daemons only)
-- `-PaseoTerminalType 'echo hi\r'` types into the opened terminal through the emulator's input path once it's live
+- `-GarbeoTerminalType 'echo hi\r'` types into the opened terminal through the emulator's input path once it's live
 - `-PaseoResizeWindow 900x500` (macOS, with `-PaseoSnapshot`) resizes the window and takes a third snapshot
 - `-PaseoSelectWorkspace first|<workspaceId>` opens a workspace on launch (macOS: tabbed view)
-- `-PaseoTerminalPassive YES` (macOS) terminal tabs never take focus, so attaching never claims the PTY size (for read-only runs against a live daemon)
+- `-GarbeoTerminalPassive YES` (macOS) terminal tabs never take focus, so attaching never claims the PTY size (for read-only runs against a live daemon)
 - `-PaseoSplit horizontal[:0.3][,vertical…]` (macOS) splits the focused pane per entry and moves a hidden tab into each new pane, as a drag would
 - `-PaseoSnapshot /path/prefix` writes a state summary (visible timelines, subscription, workspace layout) and on macOS a window PNG after launch
 - `-PaseoOpenPluginPane <pluginId>/screen/<id>` | `<pluginId>/panel/<id>[/<workspaceId>]` | `sidebar:<row label>` | `command:<pluginId>/<commandId>` opens a plugin pane once contributions load; `-PaseoPluginPress <aria-label prefix>` clicks inside it; with `-PaseoSnapshot` this writes `<prefix>-plugin.png` and `<prefix>-plugin.txt` (contributions and the bridge RPC log)
