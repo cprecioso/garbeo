@@ -1,0 +1,5 @@
+#include "Version.xcconfig"
+
+CODE_SIGN_ENTITLEMENTS = Garbeo/Garbeo.entitlements
+// Sparkle is only for direct downloads (DeveloperID.xcconfig); the App Store doesn't allow it
+EXCLUDED_SOURCE_FILE_NAMES = Sparkle.xcframework Sparkle.framework

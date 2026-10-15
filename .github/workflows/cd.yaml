@@ -32,6 +32,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The Developer ID build number is the commit count
+          fetch-depth: 0
 
       - uses: jdx/mise-action@v5
 
@@ -56,6 +59,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           SITE_URL: ${{ steps.pages.outputs.base_url }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: mise run //web:build
 
       - uses: actions/upload-pages-artifact@v5
