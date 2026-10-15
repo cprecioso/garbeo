@@ -1,0 +1,9 @@
+[deps.bundler]
+auto = true
+sources = ["Gemfile", "Gemfile.lock", "fastlane/Pluginfile"]
+
+[shell_alias]
+fastlane = "bundle exec fastlane"
+
+[settings]
+idiomatic_version_file_enable_tools = ["ruby"]

@@ -1,16 +1,10 @@
-[tools]
-ruby = "latest"
+monorepo_root = true
 
-[deps.bundler]
-auto = true
-dir = "App"
-sources = ["Gemfile", "Gemfile.lock", "fastlane/Pluginfile"]
+[monorepo]
+config_roots = ["App"]
 
 [bootstrap.packages]
 "brew:libsodium" = "latest"
-
-[shell_alias]
-fastlane = "bundle exec fastlane"
 
 [settings]
 experimental = true
