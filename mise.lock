@@ -2,14 +2,10 @@
 
 lockfile_version = 3
 
-[[tools."gem:fastlane"]]
-version = "2.240.1"
-backend = "gem:fastlane"
-specifiers = ["latest"]
-
 [[tools.ruby]]
 version = "4.0.7"
 backend = "core:ruby"
+specifiers = ["latest"]
 
 [tools.ruby."platforms.windows-x64"]
 checksum = "sha256:7a9be96d3448ecbd9a81eccae1f619131dfcc761f2c98dded03ece6c05d0474f"

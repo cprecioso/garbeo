@@ -1,6 +1,12 @@
 [tools]
-"gem:fastlane" = "latest"
 ruby = "latest"
+
+[deps.bundler]
+auto = true
+dir = "App"
 
 [bootstrap.packages]
 "brew:libsodium" = "latest"
+
+[settings]
+experimental = true
