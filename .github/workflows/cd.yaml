@@ -34,6 +34,10 @@ jobs:
 
       - uses: jdx/mise-action@v5
 
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
+
       - name: Write App Store Connect API key
         env:
           ASC_KEY: ${{ secrets.ASC_KEY }}
@@ -46,6 +50,7 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
         run: mise run //web:build
 
       - uses: actions/upload-pages-artifact@v5

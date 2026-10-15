@@ -39,6 +39,7 @@ vars = { lane = "ios beta"}
 [tasks."developer_id:mac"]
 extends = "fastlane"
 vars = { lane = "mac developer_id"}
+
 [tasks.renew_certificate]
 extends = "fastlane"
 vars = { lane = "renew_certificate"}
