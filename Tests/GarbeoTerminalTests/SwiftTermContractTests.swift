@@ -31,6 +31,21 @@ import SwiftTerm
         #expect(replies.last == RestoreReplyFilter.barrierReply)
     }
 
+    /// `DaemonQueryReplies` must recognize SwiftTerm's own answers to the queries the daemon answers.
+    @Test func repliesToDaemonAnsweredQueriesAreRecognized() async throws {
+        let view = TerminalView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        let recorder = Recorder()
+        view.terminalDelegate = recorder
+        let queries = ["\u{1b}[c", "\u{1b}[>c", "\u{1b}[5n", "\u{1b}[6n", "\u{1b}[?6n", "\u{1b}]11;?\u{1b}\\",
+                       "\u{1b}]10;?\u{07}", "\u{1b}[?2004$p"]
+        for query in queries { view.feed(byteArray: Array(query.utf8)[...]) }
+        for _ in 0..<40 where recorder.sent.count < queries.count { try await Task.sleep(for: .milliseconds(25)) }
+        #expect(recorder.sent.count == queries.count)
+        for reply in recorder.sent {
+            #expect(DaemonQueryReplies.contains(Data(reply)), "\(String(decoding: reply, as: UTF8.self).debugDescription)")
+        }
+    }
+
     /// Grid changes from layout must reach `sizeChanged`; that's how resizes get to the daemon.
     @Test func frameChangesReportGridSize() throws {
         let view = TerminalView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
@@ -39,6 +54,24 @@ import SwiftTerm
         view.setFrameSize(NSSize(width: 800, height: 600))
         let last = try #require(recorder.sizes.last)
         #expect(last.0 > 80)
+    }
+}
+
+@Suite struct DaemonQueryRepliesTests {
+    @Test func matchesQueryReplies() {
+        for reply in ["\u{1b}[?62;22c", "\u{1b}[>0;276;0c", "\u{1b}[0n", "\u{1b}[12;1R", "\u{1b}[?12;1;1R",
+                      "\u{1b}]11;rgb:ffff/ffff/ffff\u{1b}\\", "\u{1b}]10;rgb:0/0/0\u{07}", "\u{1b}[?2004;2$y",
+                      "\u{1b}[?0u", "\u{1b}P!|00000000\u{1b}\\"] {
+            #expect(DaemonQueryReplies.contains(Data(reply.utf8)), "\(reply.debugDescription)")
+        }
+    }
+
+    @Test func passesOtherEmulatorOutput() {
+        // SGR and X10 mouse reports, focus in, an OSC 4 palette reply, an XTVERSION reply.
+        for data in ["\u{1b}[<0;3;4M", "\u{1b}[M !!", "\u{1b}[I", "\u{1b}]4;1;rgb:ffff/0/0\u{1b}\\",
+                     "\u{1b}P>|SwiftTerm\u{1b}\\", "a"] {
+            #expect(!DaemonQueryReplies.contains(Data(data.utf8)), "\(data.debugDescription)")
+        }
     }
 }
 

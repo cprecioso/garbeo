@@ -154,6 +154,16 @@ final class SessionTerminalView: TerminalView, TerminalOutputSink {
         feed(byteArray: ArraySlice(data))
     }
 
+    /// Bytes the emulator generates itself (query replies, mouse reports), as opposed to typed input,
+    /// which arrives through `TerminalViewDelegate.send`.
+    nonisolated override func send(source: Terminal, data: ArraySlice<UInt8>) {
+        let data = Data(data)
+        let session = session
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { session.reply(data) }
+        }
+    }
+
     #if DEBUG
     /// Development aid: `-GarbeoTerminalType 'echo hi\r'` types through the emulator's input path
     /// shortly after the terminal goes live (and after its restore).

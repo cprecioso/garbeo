@@ -124,9 +124,15 @@ public final class TerminalSession {
 
     // MARK: Emulator callbacks
 
-    /// Bytes the emulator produced from keyboard input, paste, or terminal query replies.
+    /// Bytes the emulator produced on its own: query replies and mouse or focus reports.
+    func reply(_ data: Data) {
+        guard let data = restoreFilter.filter(data), !DaemonQueryReplies.contains(data) else { return }
+        send(data)
+    }
+
+    /// Bytes the emulator produced from keyboard input or paste.
     func send(_ data: Data) {
-        guard let data = restoreFilter.filter(data), !data.isEmpty, let attachment else { return }
+        guard !data.isEmpty, let attachment else { return }
         // Typing is direct interaction: re-claim if another client may have taken the size since.
         if ContinuousClock.now - lastClaim > .seconds(5) { claimSize() }
         enqueue { try await $0.sendTerminalInput(attachment, data: data) }

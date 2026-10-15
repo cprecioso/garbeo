@@ -47,7 +47,7 @@ Sources/GarbeoSyntax/
 Tests/PaseoKitTests/     unit tests, plus opt-in live daemon tests
   Resources/relay-vectors.json  known-answer vectors generated from the upstream TypeScript
   Fixtures/terminal-vectors.json  terminal codec vectors generated from the upstream TypeScript
-Tests/GarbeoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter
+Tests/GarbeoTerminalTests/ SwiftTerm behavior the terminal session relies on, restore reply filter, daemon-answered query replies
 Tests/GarbeoSyntaxTests/ every grammar downloads and highlights a sample; precedence, injections, diffs, language detection
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
