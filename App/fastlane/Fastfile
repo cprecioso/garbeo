@@ -22,6 +22,8 @@ end
 
 def xcodebuild_args
   args = ["-allowProvisioningUpdates"]
+  # CI can't click "Trust & Enable" for SwiftTerm's build plugin
+  args << "-skipPackagePluginValidation" if is_ci
   if ASC_KEY_PATH
     args += [
       "-authenticationKeyPath", ASC_KEY_PATH,
