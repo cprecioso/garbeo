@@ -101,7 +101,8 @@ def archive_and_export(platform:, artifact:, build_dir: File.join(BUILD_DIR, pla
   )
   xcexport(
     export_path: build_dir,
-    export_options_plist: export_options,
+    # xcexport mutates the hash it's given
+    export_options_plist: export_options.dup,
     xcargs: xcodebuild_args
   )
   File.join(build_dir, artifact)
