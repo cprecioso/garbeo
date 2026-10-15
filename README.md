@@ -121,7 +121,7 @@ The write tests create agents. When the daemon creates a workspace for them, cle
 
 ## Releases
 
-[release-please](https://github.com/googleapis/release-please) keeps a release PR open on `main`, built from [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`; with squash merges, the PR title). Merging it bumps `MARKETING_VERSION` in the project (the line marked `x-release-please-version`) and tags the release (`.github/workflows/cd.yaml`).
+[release-please](https://github.com/googleapis/release-please) keeps a release PR open on `main`, built from [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`; with squash merges, the PR title). Merging it bumps `MARKETING_VERSION` in `App/Version.xcconfig` and tags the release (`.github/workflows/cd.yaml`).
 
 ## Protocol notes
 

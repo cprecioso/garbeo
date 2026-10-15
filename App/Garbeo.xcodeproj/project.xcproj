@@ -1,8 +1,8 @@
 {
   "default-configuration": "Release",
   "configurations": [
-    "Debug",
-    "Release",
+    { "name": "Debug", "file": "Version.xcconfig" },
+    { "name": "Release", "file": "Version.xcconfig" },
   ],
   "localizations": {
     "development": "en",
@@ -32,6 +32,7 @@
     { "kind": "folder", "path": "Resources", "target-membership": [ "Garbeo" ] },
     { "kind": "folder", "path": "Garbeo", "target-membership": [ "Garbeo" ] },
     { "path": "Info.plist" },
+    { "path": "Version.xcconfig" },
     {
       "kind": "group",
       "name": "Products",
@@ -53,13 +54,13 @@
       ],
       "package-product-members": [
         {
-          "product-name": "PaseoKit",
-          "build-phase": { "build-phase": "frameworks" },
-        }, {
           "product-name": "GarbeoSyntax",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "product-name": "GarbeoTerminal",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "PaseoKit",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "bonsplit",
@@ -104,7 +105,6 @@
         "INFOPLIST_KEY_UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown",
         "LD_RUNPATH_SEARCH_PATHS": "@executable_path/Frameworks",
         "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "@executable_path/../Frameworks",
-        "MARKETING_VERSION": "0.1.0", // x-release-please-version
         "PRODUCT_BUNDLE_IDENTIFIER": "design.precioso.garbeo",
         "PRODUCT_NAME": "Garbeo",
         "PROVISIONING_PROFILE_SPECIFIER": "",

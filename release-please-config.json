@@ -5,7 +5,7 @@
   "bootstrap-sha": "728e7b2da961f691612858c49a17e85f211b3b14",
   "packages": {
     ".": {
-      "extra-files": ["App/Garbeo.xcodeproj/project.xcproj"]
+      "extra-files": ["App/Version.xcconfig"]
     }
   }
 }
