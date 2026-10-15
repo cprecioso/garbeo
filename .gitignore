@@ -4,3 +4,11 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 .DS_Store
+
+# fastlane
+App/fastlane/report.xml
+App/fastlane/Preview.html
+App/fastlane/screenshots/
+App/fastlane/test_output/
+
+mise.local.toml

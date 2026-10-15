@@ -4,6 +4,7 @@ ruby = "latest"
 [deps.bundler]
 auto = true
 dir = "App"
+sources = ["Gemfile", "Gemfile.lock", "fastlane/Pluginfile"]
 
 [bootstrap.packages]
 "brew:libsodium" = "latest"

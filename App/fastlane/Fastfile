@@ -1,0 +1,18 @@
+default_platform(:ios)
+
+VERSION_XCCONFIG = File.expand_path("../Version.xcconfig", __dir__)
+
+platform :ios do
+  desc "Set the build number to one above the latest TestFlight build"
+  lane :bump_build_number do
+    latest = latest_testflight_build_number(initial_build_number: 0).to_i
+    update_xcconfig_value(path: VERSION_XCCONFIG, name: "CURRENT_PROJECT_VERSION", value: (latest + 1).to_s)
+  end
+
+  desc "Push a new beta build to TestFlight"
+  lane :beta do
+    bump_build_number
+    build_app(scheme: "Garbeo")
+    upload_to_testflight
+  end
+end
