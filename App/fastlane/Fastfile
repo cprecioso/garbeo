@@ -42,10 +42,18 @@ lane :bump_build_number do
   update_xcconfig_value(path: VERSION_XCCONFIG, name: "CURRENT_PROJECT_VERSION", value: (latest + 1).to_s)
 end
 
+APP_STORE_EXPORT_OPTIONS = {
+  method: "app-store-connect",
+  destination: "export",
+  signingStyle: "automatic",
+  uploadSymbols: true,
+  # bump_build_number owns the build number
+  manageAppVersionAndBuildNumber: false
+}.freeze
+
 # gym can't read the Xcode 27 project.xcproj format, so call xcodebuild directly
 # https://github.com/CocoaPods/Xcodeproj/issues/1052
-def archive_and_export(platform:, artifact:)
-  build_dir = File.join(BUILD_DIR, platform)
+def archive_and_export(platform:, artifact:, build_dir: File.join(BUILD_DIR, platform), export_options: APP_STORE_EXPORT_OPTIONS)
   sh("rm", "-rf", build_dir)
   xcarchive(
     project: PROJECT,
@@ -57,14 +65,7 @@ def archive_and_export(platform:, artifact:)
   )
   xcexport(
     export_path: build_dir,
-    export_options_plist: {
-      method: "app-store-connect",
-      destination: "export",
-      signingStyle: "automatic",
-      uploadSymbols: true,
-      # bump_build_number owns the build number
-      manageAppVersionAndBuildNumber: false
-    },
+    export_options_plist: export_options,
     xcargs: xcodebuild_args
   )
   File.join(build_dir, artifact)
@@ -93,5 +94,17 @@ platform :mac do
   lane :beta do
     bump_build_number
     upload_to_testflight(pkg: build, app_platform: "osx", skip_waiting_for_build_processing: is_ci)
+  end
+
+  desc "Archive, export and notarize a Developer ID .app for direct download"
+  lane :developer_id do
+    app = archive_and_export(
+      platform: "macOS",
+      artifact: "Garbeo.app",
+      build_dir: File.join(BUILD_DIR, "developer-id"),
+      export_options: { method: "developer-id", destination: "export", signingStyle: "automatic" }
+    )
+    notarize(package: app)
+    app
   end
 end

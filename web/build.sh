@@ -1,0 +1,27 @@
+#!/bin/sh
+# Builds the download site for a notarized Garbeo.app: the zipped app, the app icon (light and dark), and index.html.
+# Usage: web/build.sh <path/to/Garbeo.app> <output directory>
+set -eu
+
+app=$1
+out=$2
+web=$(dirname "$0")
+info="$app/Contents/Info.plist"
+# Icon Composer's ictool. `xcrun ictool` is the one Xcode compiles icons with, which can't export images.
+ictool="$(xcode-select -p)/../Applications/Icon Composer.app/Contents/Executables/ictool"
+
+version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$info")
+minimum_system_version=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$info")
+commit=$(git -C "$web" rev-parse --short HEAD)
+
+rm -rf "$out"
+mkdir -p "$out"
+ditto -c -k --sequesterRsrc --keepParent "$app" "$out/Garbeo.zip"
+for rendition in Default Dark; do
+  "$ictool" "$web/../App/Resources/Garbeo.icon" --export-image --output-file "$out/icon-$rendition.png" \
+    --platform macOS --rendition "$rendition" --width 128 --height 128 --scale 2 >/dev/null
+done
+sed -e "s|{{VERSION}}|$version|g" \
+    -e "s|{{MINIMUM_SYSTEM_VERSION}}|$minimum_system_version|g" \
+    -e "s|{{COMMIT}}|$commit|g" \
+    "$web/index.html" >"$out/index.html"

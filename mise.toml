@@ -1,10 +1,15 @@
 monorepo_root = true
 
 [monorepo]
-config_roots = ["App"]
+config_roots = ["App", "web"]
 
 [bootstrap.packages]
 "brew:libsodium" = "latest"
 
 [settings]
 experimental = true
+
+# Here rather than in App/mise.toml, where tasks run from outside App/ can't find it
+[task_templates.fastlane]
+run = "bundle exec fastlane {{ vars.lane }}"
+vars = { lane = "" }

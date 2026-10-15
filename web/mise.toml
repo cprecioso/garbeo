@@ -1,0 +1,4 @@
+[tasks.build]
+description = "Build the download site from the notarized Developer ID app, into dist/"
+depends = ["//App:developer_id:mac"]
+run = "./build.sh ../App/build/developer-id/Garbeo.app dist"

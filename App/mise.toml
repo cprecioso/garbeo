@@ -10,10 +10,6 @@ fastlane = "bundle exec fastlane"
 [settings]
 idiomatic_version_file_enable_tools = ["ruby"]
 
-[task_templates.fastlane]
-run = "bundle exec fastlane {{ vars.lane }}"
-vars = { lane = "" }
-
 [tasks.build]
 depends = ["build:mac", "build:ios"]
 
@@ -39,3 +35,7 @@ vars = { lane = "ios build"}
 [tasks."beta:ios"]
 extends = "fastlane"
 vars = { lane = "ios beta"}
+
+[tasks."developer_id:mac"]
+extends = "fastlane"
+vars = { lane = "mac developer_id"}

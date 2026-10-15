@@ -123,6 +123,8 @@ The write tests create agents. When the daemon creates a workspace for them, cle
 
 [release-please](https://github.com/googleapis/release-please) keeps a release PR open on `main`, built from [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`; with squash merges, the PR title). Merging it bumps `MARKETING_VERSION` in `App/Version.xcconfig` and tags the release (`.github/workflows/cd.yaml`).
 
+Every push to `main` also publishes the Mac app for direct download at <https://cprecioso.github.io/garbeo/>. `mise run //web:build` runs `//App:developer_id:mac`, which archives the app signed with Developer ID and notarizes it into `App/build/developer-id/Garbeo.app`, then `web/build.sh` turns it into the site (the zipped app and `index.html`) in `web/dist`, which the workflow deploys to GitHub Pages. On CI it uses the same App Store Connect API key as the beta workflow, both for Xcode's cloud-managed Developer ID certificate and for notarization.
+
 ## Protocol notes
 
 Speaks protocol version 1 as defined in `packages/protocol/src/messages.ts` of [getpaseo/paseo](https://github.com/getpaseo/paseo). The client advertises `owned_subscriptions`, `explicit_event_subscriptions`, and `selective_agent_timeline`, so it only receives streams for the agents on screen:
