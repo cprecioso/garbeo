@@ -15,13 +15,27 @@ run = "bundle exec fastlane {{ vars.lane }}"
 vars = { lane = "" }
 
 [tasks.build]
-extends = "fastlane"
-vars = { lane = "build"}
+depends = ["build:mac", "build:ios"]
+
+[tasks.beta]
+depends = ["beta:mac", "beta:ios"]
 
 [tasks.bump_build_number]
 extends = "fastlane"
 vars = { lane = "bump_build_number"}
 
-[tasks.beta]
+[tasks."build:mac"]
 extends = "fastlane"
-vars = { lane = "beta"}
+vars = { lane = "mac build"}
+
+[tasks."beta:mac"]
+extends = "fastlane"
+vars = { lane = "mac beta"}
+
+[tasks."build:ios"]
+extends = "fastlane"
+vars = { lane = "ios build"}
+
+[tasks."beta:ios"]
+extends = "fastlane"
+vars = { lane = "ios beta"}

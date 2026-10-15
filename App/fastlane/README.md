@@ -13,15 +13,18 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 # Available Actions
 
-## iOS
-
-### ios bump_build_number
+### bump_build_number
 
 ```sh
-[bundle exec] fastlane ios bump_build_number
+[bundle exec] fastlane bump_build_number
 ```
 
-Set the build number to one above the latest TestFlight build
+Set the build number to one above the latest iOS or macOS TestFlight build
+
+----
+
+
+## iOS
 
 ### ios build
 
@@ -35,6 +38,27 @@ Archive and export an App Store .ipa
 
 ```sh
 [bundle exec] fastlane ios beta
+```
+
+Push a new beta build to TestFlight
+
+----
+
+
+## Mac
+
+### mac build
+
+```sh
+[bundle exec] fastlane mac build
+```
+
+Archive and export an App Store .pkg
+
+### mac beta
+
+```sh
+[bundle exec] fastlane mac beta
 ```
 
 Push a new beta build to TestFlight

@@ -4,45 +4,64 @@ VERSION_XCCONFIG = File.expand_path("../Version.xcconfig", __dir__)
 PROJECT = File.expand_path("../Garbeo.xcodeproj", __dir__)
 BUILD_DIR = File.expand_path("../build", __dir__)
 
-platform :ios do
-  desc "Set the build number to one above the latest TestFlight build"
-  lane :bump_build_number do
-    latest = latest_testflight_build_number(initial_build_number: 0).to_i
-    update_xcconfig_value(path: VERSION_XCCONFIG, name: "CURRENT_PROJECT_VERSION", value: (latest + 1).to_s)
-  end
+desc "Set the build number to one above the latest iOS or macOS TestFlight build"
+lane :bump_build_number do
+  latest = %w[ios osx].map do |platform|
+    latest_testflight_build_number(platform: platform, initial_build_number: 0).to_i
+  end.max
+  update_xcconfig_value(path: VERSION_XCCONFIG, name: "CURRENT_PROJECT_VERSION", value: (latest + 1).to_s)
+end
 
-  # gym can't read the Xcode 27 project.xcproj format, so call xcodebuild directly
-  # https://github.com/CocoaPods/Xcodeproj/issues/1052
+# gym can't read the Xcode 27 project.xcproj format, so call xcodebuild directly
+# https://github.com/CocoaPods/Xcodeproj/issues/1052
+def archive_and_export(platform:, artifact:)
+  build_dir = File.join(BUILD_DIR, platform)
+  sh("rm", "-rf", build_dir)
+  xcarchive(
+    project: PROJECT,
+    scheme: "Garbeo",
+    configuration: "Release",
+    destination: "generic/platform=#{platform}",
+    archive_path: File.join(build_dir, "Garbeo.xcarchive"),
+    xcargs: "-allowProvisioningUpdates"
+  )
+  xcexport(
+    export_path: build_dir,
+    export_options_plist: {
+      method: "app-store-connect",
+      destination: "export",
+      signingStyle: "automatic",
+      uploadSymbols: true,
+      # bump_build_number owns the build number
+      manageAppVersionAndBuildNumber: false
+    },
+    xcargs: "-allowProvisioningUpdates"
+  )
+  File.join(build_dir, artifact)
+end
+
+platform :ios do
   desc "Archive and export an App Store .ipa"
   lane :build do
-    sh("rm", "-rf", BUILD_DIR)
-    xcarchive(
-      project: PROJECT,
-      scheme: "Garbeo",
-      configuration: "Release",
-      destination: "generic/platform=iOS",
-      archive_path: File.join(BUILD_DIR, "Garbeo.xcarchive"),
-      xcargs: "-allowProvisioningUpdates"
-    )
-    xcexport(
-      export_path: BUILD_DIR,
-      export_options_plist: {
-        method: "app-store-connect",
-        destination: "export",
-        signingStyle: "automatic",
-        uploadSymbols: true,
-        # bump_build_number owns the build number
-        manageAppVersionAndBuildNumber: false
-      },
-      xcargs: "-allowProvisioningUpdates"
-    )
-    File.join(BUILD_DIR, "Garbeo.ipa")
+    archive_and_export(platform: "iOS", artifact: "Garbeo.ipa")
   end
 
   desc "Push a new beta build to TestFlight"
   lane :beta do
     bump_build_number
-    ipa = build
-    upload_to_testflight(ipa: ipa)
+    upload_to_testflight(ipa: build)
+  end
+end
+
+platform :mac do
+  desc "Archive and export an App Store .pkg"
+  lane :build do
+    archive_and_export(platform: "macOS", artifact: "Garbeo.pkg")
+  end
+
+  desc "Push a new beta build to TestFlight"
+  lane :beta do
+    bump_build_number
+    upload_to_testflight(pkg: build, app_platform: "osx")
   end
 end
