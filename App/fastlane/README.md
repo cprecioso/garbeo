@@ -23,6 +23,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Set the build number to one above the latest TestFlight build
 
+### ios build
+
+```sh
+[bundle exec] fastlane ios build
+```
+
+Archive and export an App Store .ipa
+
 ### ios beta
 
 ```sh

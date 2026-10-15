@@ -1,6 +1,8 @@
 default_platform(:ios)
 
 VERSION_XCCONFIG = File.expand_path("../Version.xcconfig", __dir__)
+PROJECT = File.expand_path("../Garbeo.xcodeproj", __dir__)
+BUILD_DIR = File.expand_path("../build", __dir__)
 
 platform :ios do
   desc "Set the build number to one above the latest TestFlight build"
@@ -9,10 +11,38 @@ platform :ios do
     update_xcconfig_value(path: VERSION_XCCONFIG, name: "CURRENT_PROJECT_VERSION", value: (latest + 1).to_s)
   end
 
+  # gym can't read the Xcode 27 project.xcproj format, so call xcodebuild directly
+  # https://github.com/CocoaPods/Xcodeproj/issues/1052
+  desc "Archive and export an App Store .ipa"
+  lane :build do
+    sh("rm", "-rf", BUILD_DIR)
+    xcarchive(
+      project: PROJECT,
+      scheme: "Garbeo",
+      configuration: "Release",
+      destination: "generic/platform=iOS",
+      archive_path: File.join(BUILD_DIR, "Garbeo.xcarchive"),
+      xcargs: "-allowProvisioningUpdates"
+    )
+    xcexport(
+      export_path: BUILD_DIR,
+      export_options_plist: {
+        method: "app-store-connect",
+        destination: "export",
+        signingStyle: "automatic",
+        uploadSymbols: true,
+        # bump_build_number owns the build number
+        manageAppVersionAndBuildNumber: false
+      },
+      xcargs: "-allowProvisioningUpdates"
+    )
+    File.join(BUILD_DIR, "Garbeo.ipa")
+  end
+
   desc "Push a new beta build to TestFlight"
   lane :beta do
     bump_build_number
-    build_app(scheme: "Garbeo")
-    upload_to_testflight
+    ipa = build
+    upload_to_testflight(ipa: ipa)
   end
 end

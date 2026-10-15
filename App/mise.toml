@@ -1,3 +1,5 @@
+redactions = ["FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD"]
+
 [deps.bundler]
 auto = true
 sources = ["Gemfile", "Gemfile.lock", "fastlane/Pluginfile"]
@@ -7,3 +9,19 @@ fastlane = "bundle exec fastlane"
 
 [settings]
 idiomatic_version_file_enable_tools = ["ruby"]
+
+[task_templates.fastlane]
+run = "bundle exec fastlane {{ vars.lane }}"
+vars = { lane = "" }
+
+[tasks.build]
+extends = "fastlane"
+vars = { lane = "build"}
+
+[tasks.bump_build_number]
+extends = "fastlane"
+vars = { lane = "bump_build_number"}
+
+[tasks.beta]
+extends = "fastlane"
+vars = { lane = "beta"}
