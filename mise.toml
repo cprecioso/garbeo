@@ -9,5 +9,8 @@ sources = ["Gemfile", "Gemfile.lock", "fastlane/Pluginfile"]
 [bootstrap.packages]
 "brew:libsodium" = "latest"
 
+[shell_alias]
+fastlane = "bundle exec fastlane"
+
 [settings]
 experimental = true
