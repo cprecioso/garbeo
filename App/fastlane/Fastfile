@@ -1,8 +1,36 @@
+require "shellwords"
+
 default_platform(:ios)
 
 VERSION_XCCONFIG = File.expand_path("../Version.xcconfig", __dir__)
 PROJECT = File.expand_path("../Garbeo.xcodeproj", __dir__)
 BUILD_DIR = File.expand_path("../build", __dir__)
+
+# CI has no logged-in Apple ID or Xcode account, so it authenticates with an App Store Connect API key
+ASC_KEY_PATH = ENV["ASC_KEY_PATH"]
+
+before_all do
+  setup_ci if is_ci
+  if ASC_KEY_PATH
+    app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_filepath: ASC_KEY_PATH
+    )
+  end
+end
+
+def xcodebuild_args
+  args = ["-allowProvisioningUpdates"]
+  if ASC_KEY_PATH
+    args += [
+      "-authenticationKeyPath", ASC_KEY_PATH,
+      "-authenticationKeyID", ENV.fetch("ASC_KEY_ID"),
+      "-authenticationKeyIssuerID", ENV.fetch("ASC_ISSUER_ID")
+    ]
+  end
+  args.shelljoin
+end
 
 desc "Set the build number to one above the latest iOS or macOS TestFlight build"
 lane :bump_build_number do
@@ -23,7 +51,7 @@ def archive_and_export(platform:, artifact:)
     configuration: "Release",
     destination: "generic/platform=#{platform}",
     archive_path: File.join(build_dir, "Garbeo.xcarchive"),
-    xcargs: "-allowProvisioningUpdates"
+    xcargs: xcodebuild_args
   )
   xcexport(
     export_path: build_dir,
@@ -35,7 +63,7 @@ def archive_and_export(platform:, artifact:)
       # bump_build_number owns the build number
       manageAppVersionAndBuildNumber: false
     },
-    xcargs: "-allowProvisioningUpdates"
+    xcargs: xcodebuild_args
   )
   File.join(build_dir, artifact)
 end
@@ -49,7 +77,7 @@ platform :ios do
   desc "Push a new beta build to TestFlight"
   lane :beta do
     bump_build_number
-    upload_to_testflight(ipa: build)
+    upload_to_testflight(ipa: build, skip_waiting_for_build_processing: is_ci)
   end
 end
 
@@ -62,6 +90,6 @@ platform :mac do
   desc "Push a new beta build to TestFlight"
   lane :beta do
     bump_build_number
-    upload_to_testflight(pkg: build, app_platform: "osx")
+    upload_to_testflight(pkg: build, app_platform: "osx", skip_waiting_for_build_processing: is_ci)
   end
 end

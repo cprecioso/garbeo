@@ -1,0 +1,56 @@
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to publish
+        type: choice
+        options:
+          - all
+          - ios
+          - mac
+        default: all
+
+name: Beta
+
+concurrency:
+  group: "beta"
+  cancel-in-progress: false
+
+jobs:
+  beta:
+    name: beta (${{ matrix.platform }})
+    runs-on: xcode-27
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(inputs.platform == 'all' && '["ios","mac"]' || format('["{0}"]', inputs.platform)) }}
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: App
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+        with:
+          working_directory: App
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_KEY: ${{ secrets.ASC_KEY }}
+        run: |
+          key_path="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$ASC_KEY" > "$key_path"
+          echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+      - name: Publish to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: mise run beta:${{ matrix.platform }}
