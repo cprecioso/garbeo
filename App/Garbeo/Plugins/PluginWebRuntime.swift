@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 import OSLog
 import PaseoKit
 import SwiftUI
@@ -292,42 +293,27 @@ private final class WeakReplyHandler: NSObject, WKScriptMessageHandlerWithReply 
 
 /// Serves the host page and its script from the app bundle at `paseo-plugin://host/`.
 final class PluginAssetSchemeHandler: NSObject, WKURLSchemeHandler {
-    static let indexHTML = """
-    <!doctype html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta http-equiv="Content-Security-Policy" content="script-src paseo-plugin: 'unsafe-eval'; object-src 'none'; base-uri 'none'; frame-src 'none'">
-    <style>
-      html, body, #root { height: 100%; margin: 0; }
-      body { font: 13px -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-      #root { display: flex; flex-direction: column; }
-    </style>
-    </head>
-    <body><div id="root"></div><script src="plugin-host.js"></script></body>
-    </html>
-    """
-
+    static var indexPage = NSDataAsset(name: "PluginHostIndex")!
+    static var pluginHostScript = NSDataAsset(name: "PluginHostScript")!
+    
     func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
         guard let url = urlSchemeTask.request.url else { return }
-        let body: Data?
-        let mime: String
+        
+        let asset: NSDataAsset
         switch url.path {
-        case "/", "/index.html":
-            body = Data(Self.indexHTML.utf8)
-            mime = "text/html"
-        case "/plugin-host.js":
-            body = Bundle.main.url(forResource: "plugin-host", withExtension: "js").flatMap { try? Data(contentsOf: $0) }
-            mime = "text/javascript"
+        case "/", "/index.html": asset = Self.indexPage
+        case "/plugin-host.js": asset = Self.pluginHostScript
         default:
-            body = nil
-            mime = "text/plain"
-        }
-        guard let body else {
             urlSchemeTask.didFailWithError(URLError(.fileDoesNotExist))
             return
         }
+        
+        let body = asset.data
+        guard let mime = UTType(asset.typeIdentifier)?.preferredMIMEType else {
+            urlSchemeTask.didFailWithError(URLError(.cannotDecodeRawData))
+            return
+        }
+        
         let response = HTTPURLResponse(
             url: url, statusCode: 200, httpVersion: "HTTP/1.1",
             headerFields: ["Content-Type": "\(mime); charset=utf-8", "Content-Length": "\(body.count)", "Cache-Control": "no-store"])!
