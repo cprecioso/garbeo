@@ -297,7 +297,9 @@ struct TimelineRowView: View {
         case .assistant(let text, _):
             MarkdownText(text)
         case .reasoning(let text):
-            CollapsibleRow(icon: "brain", title: "Thinking", subtitle: nil, tint: .secondary, isExpanded: $isExpanded) {
+            CollapsibleRow(icon: "brain", title: "Thinking", subtitle: nil, tint: .secondary,
+                           accessibilityID: AccessibilityID.Timeline.reasoning, isExpanded: $isExpanded)
+            {
                 Text(text).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
             }
         case .tool(let call):
@@ -335,7 +337,7 @@ struct TimelineRowView: View {
 }
 
 /// Consecutive reasoning and tool rows, collapsed into one row so the replies stand out.
-private struct ActivityGroup: View {
+struct ActivityGroup: View {
     let rows: [TimelineRow]
     /// The agent is still working on this group: its latest step stays visible while collapsed.
     let isLive: Bool
@@ -344,8 +346,8 @@ private struct ActivityGroup: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            CollapsibleRow(icon: "square.stack", title: title, subtitle: nil, tint: hasFailed ? .red : .secondary,
-                           trailing: statusView, isExpanded: $isExpanded)
+            CollapsibleRow(icon: "square.stack", title: Self.title(of: rows), subtitle: nil, tint: hasFailed ? .red : .secondary,
+                           trailing: statusView, accessibilityID: AccessibilityID.Timeline.activityGroup, isExpanded: $isExpanded)
             {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(rows) { row in
@@ -365,9 +367,11 @@ private struct ActivityGroup: View {
 
     private var hasFailed: Bool { calls.contains { $0.status == "failed" } }
 
-    private var title: String {
+    /// "Thinking, 3 tool calls": what the group holds.
+    nonisolated static func title(of rows: [TimelineRow]) -> String {
         var parts: [String] = []
         if rows.contains(where: { if case .reasoning = $0.kind { true } else { false } }) { parts.append("Thinking") }
+        let calls = rows.filter { if case .tool = $0.kind { true } else { false } }
         switch calls.count {
         case 0: break
         case 1: parts.append("1 tool call")
@@ -390,7 +394,9 @@ private struct ToolCallRow: View {
     @Binding var isExpanded: Bool
 
     var body: some View {
-        CollapsibleRow(icon: icon, title: call.name, subtitle: call.detail.summary, tint: tint, trailing: statusView, isExpanded: $isExpanded) {
+        CollapsibleRow(icon: icon, title: call.name, subtitle: call.detail.summary, tint: tint, trailing: statusView,
+                       accessibilityID: AccessibilityID.Timeline.toolCall, isExpanded: $isExpanded)
+        {
             VStack(alignment: .leading, spacing: 6) {
                 if let body = call.detail.body, !body.isEmpty {
                     CodeBlock(text: String(body.prefix(20_000)), isDiff: call.detail.type == "edit", language: language)
@@ -448,17 +454,19 @@ private struct CollapsibleRow<Content: View, Trailing: View>: View {
     let subtitle: String?
     let tint: Color
     var trailing: Trailing
+    let accessibilityID: String
     @Binding var isExpanded: Bool
     @ViewBuilder var content: () -> Content
 
     init(icon: String, title: String, subtitle: String?, tint: Color, trailing: Trailing = EmptyView(),
-         isExpanded: Binding<Bool>, @ViewBuilder content: @escaping () -> Content)
+         accessibilityID: String, isExpanded: Binding<Bool>, @ViewBuilder content: @escaping () -> Content)
     {
         self.icon = icon
         self.title = title
         self.subtitle = subtitle
         self.tint = tint
         self.trailing = trailing
+        self.accessibilityID = accessibilityID
         _isExpanded = isExpanded
         self.content = content
     }
@@ -485,6 +493,7 @@ private struct CollapsibleRow<Content: View, Trailing: View>: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(accessibilityID)
             if isExpanded {
                 content().padding(.leading, 22)
             }

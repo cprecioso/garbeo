@@ -14,4 +14,22 @@ enum AccessibilityID {
     enum Detail {
         static let empty = "detail.empty"
     }
+
+    enum AgentFields {
+        /// The prompt field of the New Agent and New Workspace sheets.
+        static let prompt = "agentFields.prompt"
+    }
+
+    enum NewAgent {
+        static let createButton = "newAgent.createButton"
+    }
+
+    enum Timeline {
+        /// A reasoning row's disclosure button.
+        static let reasoning = "timeline.reasoning"
+        /// A tool call row's disclosure button.
+        static let toolCall = "timeline.toolCall"
+        /// The disclosure button of consecutive reasoning and tool rows collapsed into one.
+        static let activityGroup = "timeline.activityGroup"
+    }
 }

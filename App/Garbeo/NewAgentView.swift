@@ -73,7 +73,9 @@ struct NewAgentView: View {
                     if isCreating {
                         ProgressView().controlSize(.small)
                     } else {
-                        Button("Create", action: create).disabled(!canCreate)
+                        Button("Create", action: create)
+                            .disabled(!canCreate)
+                            .accessibilityIdentifier(AccessibilityID.NewAgent.createButton)
                     }
                 }
             }
