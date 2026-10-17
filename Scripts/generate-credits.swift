@@ -1,83 +1,15 @@
-import SwiftUI
+// Generates the credits for artwork and third-party software the app uses, with their licenses: Credits.rtf, which
+// macOS shows in the About panel, and Settings.bundle, which shows them in the app's page of the iOS Settings app.
+//
+// Lists the Swift packages linked into the app (build tools and packages SwiftTerm only links off Apple platforms are
+// left out), what esbuild bundles into `plugin-host.js` (the inputs in its metafile), web-tree-sitter, and the grammars
+// in `Grammars.swift`. Update it along with any of them.
+//
+// Usage (from App/): mise run credits
 
-/// Artwork and third-party software the app uses, with their licenses: the Swift packages linked into the app (build
-/// tools and packages SwiftTerm only links off Apple platforms are left out), what esbuild bundles into
-/// `plugin-host.js` (the inputs in its metafile), web-tree-sitter, and the grammars in `Grammars.swift`. Update it
-/// along with any of them.
-struct CreditsView: View {
-    #if os(iOS)
-    @Environment(\.dismiss) private var dismiss
-    #endif
+import AppKit
 
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(Credits.sections) { section in
-                    Section {
-                        ForEach(section.credits) { credit in
-                            NavigationLink {
-                                CreditDetail(credit: credit)
-                            } label: {
-                                LabeledContent(credit.name, value: credit.license.name)
-                            }
-                        }
-                    } header: {
-                        Text(section.title)
-                    } footer: {
-                        if let footer = section.footer { Text(footer) }
-                    }
-                }
-
-                Section {
-                    ForEach(Credits.grammars, id: \.repository) { grammar in
-                        Link(destination: URL(string: "https://github.com/\(grammar.repository)")!) {
-                            LabeledContent(grammar.repository.components(separatedBy: "/").last!, value: grammar.license.name)
-                        }
-                    }
-                } header: {
-                    Text("Syntax grammars")
-                } footer: {
-                    Text("Downloaded from each grammar's repository the first time a language is highlighted.")
-                }
-            }
-            .navigationTitle("Credits")
-            #if os(iOS)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            #endif
-        }
-        #if os(macOS)
-        .frame(minWidth: 420, minHeight: 480)
-        #endif
-    }
-}
-
-private struct CreditDetail: View {
-    let credit: Credit
-
-    var body: some View {
-        ScrollView {
-            Text(verbatim: credit.licenseText)
-                .font(.callout)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-        }
-        .navigationTitle(credit.name)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Link(destination: credit.url) {
-                    Label("Website", systemImage: "safari")
-                }
-            }
-        }
-    }
-}
-
-struct Credit: Identifiable {
+struct Credit {
     var name: String
     var url: URL
     var license: License
@@ -86,7 +18,6 @@ struct Credit: Identifiable {
     /// Anything else its license file asks to keep with it.
     var note: String?
 
-    var id: String { name }
 
     init(_ name: String, _ url: String, _ license: License, _ copyright: String, note: String? = nil) {
         self.name = name
@@ -192,13 +123,25 @@ enum License {
     }
 }
 
+struct Grammar {
+    var repository: String
+    var license: License
+
+    init(_ repository: String, _ license: License) {
+        self.repository = repository
+        self.license = license
+    }
+
+    var name: String { repository.components(separatedBy: "/").last! }
+    var url: URL { URL(string: "https://github.com/\(repository)")! }
+}
+
 enum Credits {
-    struct Category: Identifiable {
+    struct Category {
         var title: String
         var footer: String?
         var credits: [Credit]
 
-        var id: String { title }
     }
 
     private static let meta = "Copyright (c) Meta Platforms, Inc. and affiliates."
@@ -261,38 +204,136 @@ enum Credits {
         ]),
     ]
 
-    static let grammars: [(repository: String, license: License)] = [
-        ("tree-sitter/tree-sitter-bash", .mit),
-        ("tree-sitter/tree-sitter-c", .mit),
-        ("tree-sitter/tree-sitter-c-sharp", .mit),
-        ("tree-sitter/tree-sitter-cpp", .mit),
-        ("tree-sitter/tree-sitter-css", .mit),
-        ("elixir-lang/tree-sitter-elixir", .apache2),
-        ("tree-sitter/tree-sitter-go", .mit),
-        ("tree-sitter/tree-sitter-haskell", .mit),
-        ("tree-sitter/tree-sitter-html", .mit),
-        ("tree-sitter/tree-sitter-java", .mit),
-        ("tree-sitter/tree-sitter-javascript", .mit),
-        ("tree-sitter/tree-sitter-json", .mit),
-        ("tree-sitter/tree-sitter-julia", .mit),
-        ("fwcd/tree-sitter-kotlin", .mit),
-        ("tree-sitter-grammars/tree-sitter-lua", .mit),
-        ("tree-sitter-grammars/tree-sitter-make", .mit),
-        ("tree-sitter-grammars/tree-sitter-markdown", .mit),
-        ("tree-sitter-grammars/tree-sitter-objc", .mit),
-        ("tree-sitter/tree-sitter-ocaml", .mit),
-        ("tree-sitter-perl/tree-sitter-perl", .mit),
-        ("tree-sitter/tree-sitter-php", .mit),
-        ("tree-sitter/tree-sitter-python", .mit),
-        ("r-lib/tree-sitter-r", .mit),
-        ("tree-sitter/tree-sitter-ruby", .mit),
-        ("tree-sitter/tree-sitter-rust", .mit),
-        ("tree-sitter/tree-sitter-scala", .mit),
-        ("alex-pinkus/tree-sitter-swift", .mit),
-        ("tree-sitter-grammars/tree-sitter-toml", .mit),
-        ("tree-sitter/tree-sitter-typescript", .mit),
-        ("tree-sitter-grammars/tree-sitter-xml", .mit),
-        ("tree-sitter-grammars/tree-sitter-yaml", .mit),
-        ("tree-sitter-grammars/tree-sitter-zig", .mit),
+    static let grammarsFooter = "Downloaded from each grammar's repository the first time a language is highlighted."
+
+    static let grammars: [Grammar] = [
+        Grammar("tree-sitter/tree-sitter-bash", .mit),
+        Grammar("tree-sitter/tree-sitter-c", .mit),
+        Grammar("tree-sitter/tree-sitter-c-sharp", .mit),
+        Grammar("tree-sitter/tree-sitter-cpp", .mit),
+        Grammar("tree-sitter/tree-sitter-css", .mit),
+        Grammar("elixir-lang/tree-sitter-elixir", .apache2),
+        Grammar("tree-sitter/tree-sitter-go", .mit),
+        Grammar("tree-sitter/tree-sitter-haskell", .mit),
+        Grammar("tree-sitter/tree-sitter-html", .mit),
+        Grammar("tree-sitter/tree-sitter-java", .mit),
+        Grammar("tree-sitter/tree-sitter-javascript", .mit),
+        Grammar("tree-sitter/tree-sitter-json", .mit),
+        Grammar("tree-sitter/tree-sitter-julia", .mit),
+        Grammar("fwcd/tree-sitter-kotlin", .mit),
+        Grammar("tree-sitter-grammars/tree-sitter-lua", .mit),
+        Grammar("tree-sitter-grammars/tree-sitter-make", .mit),
+        Grammar("tree-sitter-grammars/tree-sitter-markdown", .mit),
+        Grammar("tree-sitter-grammars/tree-sitter-objc", .mit),
+        Grammar("tree-sitter/tree-sitter-ocaml", .mit),
+        Grammar("tree-sitter-perl/tree-sitter-perl", .mit),
+        Grammar("tree-sitter/tree-sitter-php", .mit),
+        Grammar("tree-sitter/tree-sitter-python", .mit),
+        Grammar("r-lib/tree-sitter-r", .mit),
+        Grammar("tree-sitter/tree-sitter-ruby", .mit),
+        Grammar("tree-sitter/tree-sitter-rust", .mit),
+        Grammar("tree-sitter/tree-sitter-scala", .mit),
+        Grammar("alex-pinkus/tree-sitter-swift", .mit),
+        Grammar("tree-sitter-grammars/tree-sitter-toml", .mit),
+        Grammar("tree-sitter/tree-sitter-typescript", .mit),
+        Grammar("tree-sitter-grammars/tree-sitter-xml", .mit),
+        Grammar("tree-sitter-grammars/tree-sitter-yaml", .mit),
+        Grammar("tree-sitter-grammars/tree-sitter-zig", .mit),
     ]
 }
+
+let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+let fileManager = FileManager.default
+
+// MARK: Credits.rtf
+
+let rtf = NSMutableAttributedString()
+
+func paragraph(_ string: String, font: NSFont = .systemFont(ofSize: 11), link: URL? = nil,
+               alignment: NSTextAlignment = .center, spacingBefore: CGFloat = 0)
+{
+    let style = NSMutableParagraphStyle()
+    style.alignment = alignment
+    style.paragraphSpacingBefore = spacingBefore
+    var attributes: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: style]
+    if rtf.length > 0 { rtf.append(NSAttributedString(string: "\n", attributes: attributes)) }
+    attributes[.link] = link
+    rtf.append(NSAttributedString(string: string, attributes: attributes))
+}
+
+func heading(_ title: String, footer: String? = nil) {
+    paragraph(title, font: .boldSystemFont(ofSize: 12), spacingBefore: rtf.length == 0 ? 0 : 14)
+    if let footer { paragraph(footer) }
+}
+
+for section in Credits.sections {
+    heading(section.title, footer: section.footer)
+    for credit in section.credits {
+        paragraph("\(credit.name) (\(credit.license.name))", font: .boldSystemFont(ofSize: 11), link: credit.url, spacingBefore: 6)
+        paragraph(credit.copyright)
+        if let note = credit.note { paragraph(note) }
+    }
+}
+
+heading("Syntax grammars", footer: Credits.grammarsFooter)
+for grammar in Credits.grammars {
+    paragraph("\(grammar.name) (\(grammar.license.name))", link: grammar.url, spacingBefore: 2)
+}
+
+heading("Licenses")
+var seen = Set<License>()
+let licenses = (Credits.sections.flatMap { $0.credits.map(\.license) } + Credits.grammars.map(\.license))
+    .filter { seen.insert($0).inserted }
+for license in licenses {
+    paragraph(license.name, font: .boldSystemFont(ofSize: 11), spacingBefore: 8)
+    paragraph(license.text, font: .systemFont(ofSize: 10), alignment: .natural)
+}
+
+// The RTF writer swaps the system font for Helvetica Neue; name it the way TextEdit does so it stays the system font.
+let rtfData = rtf.rtf(from: NSRange(location: 0, length: rtf.length))!
+try String(decoding: rtfData, as: UTF8.self)
+    .replacing(#/HelveticaNeue(-Bold)?;/#, with: ".AppleSystemUIFont;")
+    .write(to: resources.appending(path: "Credits.rtf"), atomically: true, encoding: .utf8)
+
+// MARK: Settings.bundle
+
+let bundle = resources.appending(path: "Settings.bundle")
+try? fileManager.removeItem(at: bundle)
+try fileManager.createDirectory(at: bundle.appending(path: "Credits"), withIntermediateDirectories: true)
+
+func writePane(_ name: String, title: String? = nil, _ specifiers: [[String: String]]) throws {
+    var plist: [String: Any] = ["PreferenceSpecifiers": specifiers]
+    plist["Title"] = title
+    let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+    try data.write(to: bundle.appending(path: "\(name).plist"))
+}
+
+try writePane("Root", [
+    ["Type": "PSGroupSpecifier"],
+    ["Type": "PSChildPaneSpecifier", "Title": "Credits", "File": "Credits"],
+])
+
+var specifiers: [[String: String]] = []
+for section in Credits.sections {
+    var group = ["Type": "PSGroupSpecifier", "Title": section.title]
+    group["FooterText"] = section.footer
+    specifiers.append(group)
+    for credit in section.credits {
+        let file = "Credits/" + credit.name.lowercased()
+            .replacing(#/[^a-z0-9]+/#, with: "-")
+            .trimmingCharacters(in: ["-"])
+        specifiers.append(["Type": "PSChildPaneSpecifier", "Title": credit.name, "File": file])
+        try writePane(file, title: credit.name, [
+            ["Type": "PSGroupSpecifier", "Title": credit.license.name, "FooterText": credit.licenseText],
+        ])
+    }
+}
+
+specifiers.append(["Type": "PSGroupSpecifier", "Title": "Syntax grammars", "FooterText": Credits.grammarsFooter])
+for grammar in Credits.grammars {
+    specifiers.append([
+        "Type": "PSTitleValueSpecifier", "Key": "credits.grammar.\(grammar.repository)",
+        "Title": grammar.name, "DefaultValue": grammar.license.name,
+    ])
+}
+try writePane("Credits", title: "Credits", specifiers)

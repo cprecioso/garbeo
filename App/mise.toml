@@ -56,3 +56,8 @@ description = "iOS UI tests (GarbeoUITests) against a throwaway daemon (or PASEO
 extends = "xcodebuild-test"
 vars = { target = "GarbeoUITests", platform = "ios", destination = "platform=iOS Simulator,name=${IOS_SIMULATOR:-iPhone 17}", wrapper = "../Scripts/with-test-daemon.sh" }
 
+[tasks.credits]
+description = "Regenerate Credits.rtf (macOS About panel) and Settings.bundle (iOS Settings app)"
+dir = "{{config_root}}"
+run = "swift ../Scripts/generate-credits.swift Resources"
+

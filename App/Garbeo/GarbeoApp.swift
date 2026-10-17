@@ -33,35 +33,12 @@ struct GarbeoApp: App {
         }
         .commands {
             GarbeoCommands(model: model)
-            #if os(macOS)
-            CommandGroup(after: .appInfo) {
-                CreditsMenuItem()
-            }
-            #endif
         }
         #if os(macOS)
         .defaultSize(width: 1180, height: 760)
         #endif
-
-        #if os(macOS)
-        Window("Credits", id: CreditsMenuItem.windowId) {
-            CreditsView()
-        }
-        .defaultSize(width: 520, height: 640)
-        #endif
     }
 }
-
-#if os(macOS)
-private struct CreditsMenuItem: View {
-    static let windowId = "credits"
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("Credits") { openWindow(id: Self.windowId) }
-    }
-}
-#endif
 
 struct RootView: View {
     @Environment(AppModel.self) private var model

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>FooterText</key>
+			<string>Created by Cuputo from Noun Project
+
+Licensed under the Creative Commons Attribution 3.0 license: https://creativecommons.org/licenses/by/3.0/</string>
+			<key>Title</key>
+			<string>CC BY 3.0</string>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+		</dict>
+	</array>
+	<key>Title</key>
+	<string>Running</string>
+</dict>
+</plist>
