@@ -537,8 +537,7 @@ private struct ComposerView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.red)
-                .help("Stop the current turn")
-                .keyboardShortcut(".", modifiers: .command)
+                .help("Stop the current turn (⌘.)")
             }
             Button(action: send) {
                 Image(systemName: "arrow.up.circle.fill").font(.title)

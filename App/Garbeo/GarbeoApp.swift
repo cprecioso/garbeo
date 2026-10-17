@@ -25,20 +25,16 @@ struct GarbeoApp: App {
                     }
                 }
         }
-        #if os(macOS)
-        .defaultSize(width: 1180, height: 760)
         .commands {
+            GarbeoCommands(model: model)
+            #if os(macOS)
             CommandGroup(after: .appInfo) {
                 CreditsMenuItem()
             }
-            CommandMenu("Daemon") {
-                Button("Reconnect") { model.retryNow() }
-                    .keyboardShortcut("r", modifiers: [.command, .shift])
-                    .disabled(model.endpoint == nil)
-                Button("Disconnect") { model.forgetEndpoint() }
-                    .disabled(model.endpoint == nil)
-            }
+            #endif
         }
+        #if os(macOS)
+        .defaultSize(width: 1180, height: 760)
         #endif
 
         #if os(macOS)
@@ -91,8 +87,6 @@ struct RootView: View {
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
-    @State private var showingNewAgent = false
-    @State private var showingNewWorkspace = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     #if os(macOS)
     @State private var workspaceTabs = WorkspaceTabsRegistry()
@@ -102,8 +96,9 @@ struct MainView: View {
 
     var body: some View {
         @Bindable var model = model
+        @Bindable var center = model.commandCenter
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+            SidebarView(showingNewAgent: $center.showingNewAgent, showingNewWorkspace: $center.showingNewWorkspace)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             #if os(macOS)
@@ -112,7 +107,7 @@ struct MainView: View {
             } else if let workspace = model.selectedWorkspace {
                 WorkspaceView(
                     workspace: workspace, tabs: workspaceTabs.tabs(for: workspace, model: model),
-                    showingNewAgent: $showingNewAgent)
+                    showingNewAgent: $center.showingNewAgent)
                     .id(workspace.id)
             } else if let terminal = model.terminals.selectedTerminal {
                 TerminalDetailView(terminal: terminal)
@@ -121,7 +116,7 @@ struct MainView: View {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
-                EmptyDetailView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+                EmptyDetailView(showingNewAgent: $center.showingNewAgent, showingNewWorkspace: $center.showingNewWorkspace)
             }
             #else
             if let pane = model.plugins.activePane, sizeClass != .compact {
@@ -133,14 +128,14 @@ struct MainView: View {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
-                EmptyDetailView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+                EmptyDetailView(showingNewAgent: $center.showingNewAgent, showingNewWorkspace: $center.showingNewWorkspace)
             }
             #endif
         }
-        .sheet(isPresented: $showingNewAgent) {
+        .sheet(isPresented: $center.showingNewAgent) {
             NewAgentView()
         }
-        .sheet(isPresented: $showingNewWorkspace) {
+        .sheet(isPresented: $center.showingNewWorkspace) {
             NewWorkspaceView()
         }
         #if os(iOS)
@@ -156,6 +151,7 @@ struct MainView: View {
         .onChange(of: model.selection) { _, selection in
             if selection != nil { model.plugins.activePane = nil }
         }
+        .commandCenter()
         .background(PluginRegistryHost())
     }
 }

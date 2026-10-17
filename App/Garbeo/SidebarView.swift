@@ -51,7 +51,6 @@ struct SidebarView: View {
                 } label: {
                     Label("New Agent", systemImage: "square.and.pencil")
                 }
-                .keyboardShortcut("n")
                 .disabled(!model.connection.isConnected)
             }
             ToolbarItem(placement: .primaryAction) {
@@ -60,10 +59,16 @@ struct SidebarView: View {
                 } label: {
                     Label("New Workspace", systemImage: "folder.badge.plus")
                 }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(!model.connection.isConnected)
             }
             #if os(iOS)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    model.commandCenter.isPresented = true
+                } label: {
+                    Label("Command Center", systemImage: "command")
+                }
+            }
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     Button("Reconnect", systemImage: "arrow.clockwise") { model.retryNow() }

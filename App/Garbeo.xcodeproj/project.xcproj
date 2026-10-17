@@ -16,6 +16,12 @@
       "path": "..",
     }, {
       "kind": "remote",
+      "repository": "https://github.com/adamtheturtle/CommandPaletteKit.git",
+      "version": {
+        "up-to-next-minor-version": "0.3.0",
+      },
+    }, {
+      "kind": "remote",
       "repository": "https://github.com/almonk/bonsplit.git",
       "version": {
         "up-to-next-major-version": "1.1.1",
@@ -63,6 +69,10 @@
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "product-name": "PaseoKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "CommandPaletteKit",
+          "product-name": "CommandPaletteKit",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "bonsplit",

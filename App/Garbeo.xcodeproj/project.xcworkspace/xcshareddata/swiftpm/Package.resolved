@@ -1,5 +1,5 @@
 {
-  "originHash" : "51d7fa89b9ca732d5ac9677be2a8fc0235aee77f6efa2e187dd07a20faffca7a",
+  "originHash" : "f68bec39d96176678a114a567b0d32cf418bf5a0bf887433e8f590c4153026a6",
   "pins" : [
     {
       "identity" : "bonsplit",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "7c322f078c388438e4b7896a86c57598aa7e203d",
         "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "commandpalettekit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/adamtheturtle/CommandPaletteKit.git",
+      "state" : {
+        "revision" : "cf93b66c6f557677c70f95eed40374fa99c8034a",
+        "version" : "0.3.0"
       }
     },
     {

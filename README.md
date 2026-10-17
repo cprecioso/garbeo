@@ -18,6 +18,7 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Workspace setup progress: live status of the project's setup scripts above the workspace's tabs (macOS) or in its sidebar section (iOS), with per-command output, and approval for setups blocked on a fork pull request's code
 - Workspace terminals: tabs of their workspace on macOS, listed per workspace in the sidebar on iOS (live via `terminals_changed`), opened in a real terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with keyboard input, screen restore on attach, resize, new and kill. On iOS, SwiftTerm's accessory bar provides esc, ctrl, tab, and arrow keys
 - Automatic reconnect with backoff; ping/pong liveness lease
+- Command Center (⌘K, [CommandPaletteKit](https://github.com/adamtheturtle/CommandPaletteKit)): fuzzy-search agents, workspaces, terminals, app commands and plugin commands, with recents first. The same commands fill the menu bar (File, Agent, Go, Daemon, Plugins) with their shortcuts, so macOS Help search and the iPad menu bar find them too
 - Plugin UI: screens, workspace/agent panels, sidebar items and Command Center items from [Paseo plugins](https://paseo.sh/docs/plugins) run unmodified in WKWebView panes (see [Plugins](#plugins))
 
 ## Layout
@@ -57,6 +58,7 @@ scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
 App/Garbeo.xcodeproj     multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
 App/Garbeo/              views + AppModel (observable store), HostStore (saved hosts), QR scanner, credits (keep CreditsView in step with dependencies)
   Workspace/             workspace tabs: tab content model, saved layout, Bonsplit integration (macOS)
+  Commands/              command registry (AppCommand), menu bar, Command Center palette
   Plugins/               PluginStore, WKWebView runtime + bridge, PluginPaneView, PluginTab, sidebar/menu entries
   PluginHost/plugin-host.js  generated JS host runtime (do not edit)
 PluginHost/              source of the JS host runtime (React, react-native-web, Paseo plugin SDK)

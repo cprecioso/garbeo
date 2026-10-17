@@ -214,6 +214,7 @@ enum Credits {
         ]),
         Category(title: "Swift packages", credits: [
             Credit("Bonsplit", "https://github.com/almonk/bonsplit", .mit, "Copyright (c) Alasdair Monk"),
+            Credit("CommandPaletteKit", "https://github.com/adamtheturtle/CommandPaletteKit", .mit, "Copyright (c) 2026 Adam Dangoor"),
             Credit("libsodium", "https://github.com/jedisct1/libsodium", .isc, "Copyright (c) 2013-2026 Frank Denis <j at pureftpd dot org>"),
             Credit("swift-concurrency-extras", "https://github.com/pointfreeco/swift-concurrency-extras", .mit, "Copyright (c) 2023 Point-Free"),
             Credit("swift-sodium", "https://github.com/jedisct1/swift-sodium", .isc, "Copyright (c) 2014-2026, Frank Denis <j at pureftpd dot org>"),
