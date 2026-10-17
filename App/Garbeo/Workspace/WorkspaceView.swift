@@ -37,6 +37,8 @@ struct WorkspaceView: View {
                 .environment(model)
         }
         .safeAreaInset(edge: .top, spacing: 0) { WorkspaceSetupBanner(workspace: workspace) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(AccessibilityID.Workspace.view)
         .navigationTitle(workspace.displayName)
         .navigationSubtitle((workspace.workspaceDirectory as NSString).abbreviatingWithTildeInPath)
         .toolbar {

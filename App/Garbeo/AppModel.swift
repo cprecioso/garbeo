@@ -306,7 +306,7 @@ final class AppModel {
 
     // MARK: Events
 
-    private func handle(_ event: DaemonEvent) {
+    func handle(_ event: DaemonEvent) {
         switch event {
         case .agentUpdate(.upsert(let agent)):
             agents[agent.id] = agent
@@ -496,6 +496,11 @@ final class AppModel {
         let agent = try await client.createAgent(options)
         agents[agent.id] = agent
         selection = .agent(agent.id)
+    }
+
+    /// ⌘T: a new terminal in `workspace`, selected so it opens in a tab (macOS) or the detail (iOS).
+    func openNewTab(in workspace: Workspace) async {
+        await terminals.create(in: workspace)
     }
 
     /// Creates a worktree workspace and selects it. When `firstAgent` is given, also starts an agent
