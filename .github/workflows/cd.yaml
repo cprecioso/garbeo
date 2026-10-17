@@ -22,24 +22,29 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v5
 
-  site:
+  beta:
+    name: beta (${{ matrix.platform }})
     runs-on: xcode-27
     timeout-minutes: 60
 
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ios, mac]
+
     permissions:
       contents: read
-      pages: read
+
+    defaults:
+      run:
+        working-directory: App
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          # The nightly build number is the commit count
-          fetch-depth: 0
 
       - uses: jdx/mise-action@v5
-
-      - id: pages
-        uses: actions/configure-pages@v6
+        with:
+          working_directory: App
 
       - uses: webfactory/ssh-agent@v0.10.0
         with:
@@ -53,31 +58,9 @@ jobs:
           printf '%s' "$ASC_KEY" > "$key_path"
           echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
 
-      - name: Build site
+      - name: Publish to TestFlight
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          SITE_URL: ${{ steps.pages.outputs.base_url }}
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: mise run //web:build
-
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: web/dist
-
-  deploy-site:
-    needs: site
-    runs-on: ubuntu-latest
-
-    permissions:
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5
+        run: mise run beta:${{ matrix.platform }}

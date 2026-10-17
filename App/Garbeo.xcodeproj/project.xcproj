@@ -3,8 +3,6 @@
   "configurations": [
     { "name": "Debug", "file": "Base.xcconfig" },
     { "name": "Release", "file": "Release.xcconfig" },
-    { "name": "Beta", "file": "Beta.xcconfig" },
-    { "name": "Nightly", "file": "Nightly.xcconfig" },
   ],
   "localizations": {
     "development": "en",
@@ -28,12 +26,6 @@
       "version": {
         "up-to-next-minor-version": "0.5.0",
       },
-    }, {
-      "kind": "remote",
-      "repository": "https://github.com/sparkle-project/Sparkle",
-      "version": {
-        "up-to-next-major-version": "2.10.0",
-      },
     },
   ],
   "files": [
@@ -41,8 +33,6 @@
     { "kind": "folder", "path": "Garbeo", "target-membership": [ "Garbeo" ] },
     { "path": "Info.plist" },
     { "path": "Base.xcconfig" },
-    { "path": "Beta.xcconfig" },
-    { "path": "Nightly.xcconfig" },
     { "path": "Release.xcconfig" },
     { "path": "Version.xcconfig" },
     {
@@ -82,14 +72,10 @@
           "package": "textual",
           "product-name": "Textual",
           "build-phase": { "build-phase": "frameworks" },
-        }, {
-          "package": "Sparkle",
-          "product-name": "Sparkle",
-          "build-phase": { "build-phase": "frameworks", "platforms": [ "macos" ] },
         },
       ],
       "build-settings": {
-        "ASSETCATALOG_COMPILER_APPICON_NAME": "$(APP_ICON_NAME)",
+        "ASSETCATALOG_COMPILER_APPICON_NAME": "Garbeo",
         "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
         "AUTOMATION_APPLE_EVENTS": "NO",
         "CODE_SIGN_IDENTITY": "Apple Development",
@@ -111,7 +97,7 @@
         "ENABLE_RESOURCE_ACCESS_USB": "NO",
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_FILE": "Info.plist",
-        "INFOPLIST_KEY_CFBundleDisplayName": "$(APP_DISPLAY_NAME)",
+        "INFOPLIST_KEY_CFBundleDisplayName": "Garbeo",
         "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption": "NO",
         "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.developer-tools",
         "INFOPLIST_KEY_NSCameraUsageDescription": "Garbeo uses the camera to scan the pairing QR code shown by your Paseo daemon.",
@@ -122,7 +108,7 @@
         "LD_RUNPATH_SEARCH_PATHS": "@executable_path/Frameworks",
         "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "@executable_path/../Frameworks",
         "PRODUCT_BUNDLE_IDENTIFIER": "design.precioso.garbeo",
-        "PRODUCT_NAME": "$(APP_DISPLAY_NAME)",
+        "PRODUCT_NAME": "Garbeo",
         "PROVISIONING_PROFILE_SPECIFIER": "",
         "RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES": "NO",
         "RUNTIME_EXCEPTION_ALLOW_JIT": "NO",

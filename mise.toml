@@ -1,7 +1,7 @@
 monorepo_root = true
 
 [monorepo]
-config_roots = ["App", "web"]
+config_roots = ["App"]
 
 [bootstrap.packages]
 "brew:libsodium" = "latest"

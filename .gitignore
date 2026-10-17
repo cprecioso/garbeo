@@ -12,8 +12,5 @@ App/fastlane/screenshots/
 App/fastlane/test_output/
 App/build/
 
-# web
-web/dist/
-
 mise.local.*
 fnox.local.toml

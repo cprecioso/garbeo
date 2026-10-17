@@ -4,9 +4,6 @@ import SwiftUI
 @main
 struct GarbeoApp: App {
     @State private var model = AppModel()
-    #if SPARKLE
-    @StateObject private var updater = SoftwareUpdater()
-    #endif
 
     var body: some Scene {
         WindowGroup {
@@ -32,9 +29,6 @@ struct GarbeoApp: App {
         .defaultSize(width: 1180, height: 760)
         .commands {
             CommandGroup(after: .appInfo) {
-                #if SPARKLE
-                CheckForUpdatesMenuItem(updater: updater)
-                #endif
                 CreditsMenuItem()
             }
             CommandMenu("Daemon") {

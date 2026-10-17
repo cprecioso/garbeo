@@ -126,7 +126,7 @@ The write tests create agents. When the daemon creates a workspace for them, cle
 
 [release-please](https://github.com/googleapis/release-please) keeps a release PR open on `main`, built from [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`; with squash merges, the PR title). Merging it bumps `MARKETING_VERSION` in `App/Version.xcconfig` and tags the release (`.github/workflows/cd.yaml`).
 
-Every push to `main` also publishes the Mac app for direct download at <https://cprecioso.github.io/garbeo/>. `mise run //web:build` runs `//App:nightly:mac`, which archives the app in the `Nightly` configuration, signed with Developer ID, and notarizes it into `App/build/nightly/Garbeo.app`, then `web/build.sh` turns it into the site (the zipped app and `index.html`) in `web/dist`, which the workflow deploys to GitHub Pages. On CI it uses the same App Store Connect API key as the beta workflow, both for Xcode's cloud-managed Developer ID certificate and for notarization.
+Every push to `main` also publishes the iOS and Mac apps to TestFlight (`mise run //App:beta:ios` and `//App:beta:mac`). Betas are built in the `Release` configuration, the same name and icon as a release, so any of them can be promoted to the App Store.
 
 ## Protocol notes
 

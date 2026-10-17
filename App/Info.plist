@@ -9,12 +9,5 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<!-- Sparkle settings, inert in builds without Sparkle (all but the Nightly configuration) -->
-	<key>SUFeedURL</key>
-	<string>https://cprecioso.github.io/garbeo/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>QgistUpLWDzsFzEvWkRvKU/ps+VEsR9AMjHmICvtqHM=</string>
-	<key>SUEnableInstallerLauncherService</key>
-	<true/>
 </dict>
 </plist>

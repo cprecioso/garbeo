@@ -63,14 +63,6 @@ Archive and export an App Store .pkg
 
 Push a new beta build to TestFlight
 
-### mac nightly
-
-```sh
-[bundle exec] fastlane mac nightly
-```
-
-Archive, export and notarize a Developer ID .app for direct download
-
 ----
 
 This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.
