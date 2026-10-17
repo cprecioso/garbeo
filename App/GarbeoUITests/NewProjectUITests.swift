@@ -49,7 +49,10 @@ final class NewProjectUITests: XCTestCase {
         path.replaceText("/garbeo-ui-missing-\(UUID().uuidString.prefix(8).lowercased())")
         XCTAssertTrue(error.waitForNonExistence(timeout: 5))
         create.clickOrTap()
-        XCTAssertTrue(text("Directory not found", in: app).waitForExistence(timeout: 15))
+        XCTAssertTrue(error.waitForExistence(timeout: 15))
+        // macOS exposes a text's contents as its value, iOS as its label.
+        let message = (error.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? error.label
+        XCTAssertTrue(message.contains("Directory not found"), message)
         XCTAssertTrue(path.exists)
 
         // A real directory with a name adds the project and lists it in the sidebar.
@@ -67,15 +70,13 @@ final class NewProjectUITests: XCTestCase {
             app.navigationBars.buttons.element(boundBy: 0).clickOrTap()
         }
         #endif
-        XCTAssertTrue(text(projectName, in: app).waitForExistence(timeout: 15), "the project isn't in the sidebar")
+        // The project's sidebar section header carries its name as the label. (Matching on `value` too
+        // would fail the whole query once a text with a non-string value is on screen.)
+        let header = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", projectName)).firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 15), "the project isn't in the sidebar")
         #if os(macOS)
         // Selecting its workspace opens it in place of the empty detail.
         XCTAssertTrue(app.element(AccessibilityID.Detail.empty).waitForNonExistence(timeout: 10), "its workspace isn't selected")
         #endif
-    }
-
-    /// Static text containing `string`: macOS exposes a text's contents as its value, iOS as its label.
-    private func text(_ string: String, in app: XCUIApplication) -> XCUIElement {
-        app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", string, string)).firstMatch
     }
 }
