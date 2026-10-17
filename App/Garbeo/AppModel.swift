@@ -58,6 +58,7 @@ final class AppModel {
     let terminals = TerminalDirectory()
     var lastError: String?
     let plugins = PluginStore()
+    let commandCenter = CommandCenter()
 
     var endpoint: DaemonEndpoint? {
         didSet { Self.saveEndpoint(endpoint) }

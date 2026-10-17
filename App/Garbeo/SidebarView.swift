@@ -56,7 +56,6 @@ struct SidebarView: View {
                     Label("New Agent", systemImage: "square.and.pencil")
                 }
                 .accessibilityIdentifier(AccessibilityID.Sidebar.newAgent)
-                .keyboardShortcut("n")
                 .disabled(!model.connection.isConnected)
             }
             ToolbarItem(placement: .primaryAction) {
@@ -65,7 +64,6 @@ struct SidebarView: View {
                 } label: {
                     Label("New Workspace", systemImage: "folder.badge.plus")
                 }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(!model.connection.isConnected)
             }
             ToolbarItem(placement: .primaryAction) {
@@ -74,14 +72,17 @@ struct SidebarView: View {
                 } label: {
                     Label("New Project", systemImage: "plus.rectangle.on.folder")
                 }
-                #if os(iOS)
-                // On macOS the File menu's New Project item has the shortcut.
-                .keyboardShortcut("n", modifiers: [.command, .option])
-                #endif
                 .disabled(!model.connection.isConnected)
                 .accessibilityIdentifier(AccessibilityID.Sidebar.newProject)
             }
             #if os(iOS)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    model.commandCenter.isPresented = true
+                } label: {
+                    Label("Command Center", systemImage: "command")
+                }
+            }
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     Button("Reconnect", systemImage: "arrow.clockwise") { model.retryNow() }

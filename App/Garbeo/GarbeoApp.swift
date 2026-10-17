@@ -31,31 +31,17 @@ struct GarbeoApp: App {
                     }
                 }
         }
-        #if os(macOS)
-        .defaultSize(width: 1180, height: 760)
-        #endif
         .commands {
+            GarbeoCommands(model: model)
             #if os(macOS)
             CommandGroup(after: .appInfo) {
                 CreditsMenuItem()
             }
             #endif
-            CommandGroup(after: .newItem) {
-                NewTabMenuItem(model: model)
-            }
-            #if os(macOS)
-            CommandGroup(after: .newItem) {
-                NewProjectMenuItem()
-            }
-            CommandMenu("Daemon") {
-                Button("Reconnect") { model.retryNow() }
-                    .keyboardShortcut("r", modifiers: [.command, .shift])
-                    .disabled(model.endpoint == nil)
-                Button("Disconnect") { model.forgetEndpoint() }
-                    .disabled(model.endpoint == nil)
-            }
-            #endif
         }
+        #if os(macOS)
+        .defaultSize(width: 1180, height: 760)
+        #endif
 
         #if os(macOS)
         Window("Credits", id: CreditsMenuItem.windowId) {
@@ -73,49 +59,6 @@ private struct CreditsMenuItem: View {
 
     var body: some View {
         Button("Credits") { openWindow(id: Self.windowId) }
-    }
-}
-#endif
-
-/// ⌘T: a new terminal tab in the focused window's workspace (on iOS, a new terminal shown in the detail).
-private struct NewTabMenuItem: View {
-    let model: AppModel
-    @FocusedValue(\.selectedWorkspace) private var workspace
-
-    var body: some View {
-        Button(newTabTitle) {
-            guard let workspace else { return }
-            Task { await model.openNewTab(in: workspace) }
-        }
-        .keyboardShortcut("t")
-        .disabled(workspace == nil || !model.connection.isConnected)
-    }
-
-    private var newTabTitle: String {
-        #if os(macOS)
-        "New Terminal Tab"
-        #else
-        "New Terminal"
-        #endif
-    }
-}
-
-extension FocusedValues {
-    /// The workspace of the focused window's selection.
-    @Entry var selectedWorkspace: Workspace?
-
-    /// Presents the New Project sheet of the focused window, while it is connected.
-    @Entry var showingNewProject: Binding<Bool>?
-}
-
-#if os(macOS)
-private struct NewProjectMenuItem: View {
-    @FocusedBinding(\.showingNewProject) private var showingNewProject
-
-    var body: some View {
-        Button("New Project…") { showingNewProject = true }
-            .keyboardShortcut("n", modifiers: [.command, .option])
-            .disabled(showingNewProject == nil)
     }
 }
 #endif
@@ -150,8 +93,6 @@ struct RootView: View {
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
-    @State private var showingNewWorkspace = false
-    @State private var showingNewProject = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     #if os(macOS)
     @State private var workspaceTabs = WorkspaceTabsRegistry()
@@ -161,10 +102,11 @@ struct MainView: View {
 
     var body: some View {
         @Bindable var model = model
+        @Bindable var center = model.commandCenter
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(
-                showingNewWorkspace: $showingNewWorkspace,
-                showingNewProject: $showingNewProject)
+                showingNewWorkspace: $center.showingNewWorkspace,
+                showingNewProject: $center.showingNewProject)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             #if os(macOS)
@@ -184,8 +126,8 @@ struct MainView: View {
                     .id(agent.id)
             } else {
                 EmptyDetailView(
-                    showingNewWorkspace: $showingNewWorkspace,
-                    showingNewProject: $showingNewProject)
+                    showingNewWorkspace: $center.showingNewWorkspace,
+                    showingNewProject: $center.showingNewProject)
             }
             #else
             if let pane = model.plugins.activePane, sizeClass != .compact {
@@ -201,18 +143,17 @@ struct MainView: View {
                     .id(agent.id)
             } else {
                 EmptyDetailView(
-                    showingNewWorkspace: $showingNewWorkspace,
-                    showingNewProject: $showingNewProject)
+                    showingNewWorkspace: $center.showingNewWorkspace,
+                    showingNewProject: $center.showingNewProject)
             }
             #endif
         }
-        .sheet(isPresented: $showingNewWorkspace) {
+        .sheet(isPresented: $center.showingNewWorkspace) {
             NewWorkspaceView()
         }
-        .sheet(isPresented: $showingNewProject) {
+        .sheet(isPresented: $center.showingNewProject) {
             NewProjectView()
         }
-        .focusedSceneValue(\.showingNewProject, model.connection.isConnected ? $showingNewProject : nil)
         #if os(iOS)
         // Compact iPhone layouts show the sidebar alone, so plugin panes open as a sheet there.
         .sheet(item: Binding(
@@ -226,8 +167,8 @@ struct MainView: View {
         .onChange(of: model.selection) { _, selection in
             if selection != nil { model.plugins.activePane = nil }
         }
+        .commandCenter()
         .background(PluginRegistryHost())
-        .focusedSceneValue(\.selectedWorkspace, model.selectedWorkspace)
     }
 }
 
