@@ -97,6 +97,7 @@ struct AgentFields: View {
         Section("Prompt") {
             TextField("What should the agent do?", text: $draft.prompt, axis: .vertical)
                 .lineLimit(4...12)
+                .accessibilityIdentifier(AccessibilityID.AgentFields.prompt)
         }
     }
 }

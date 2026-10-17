@@ -52,4 +52,18 @@ enum AccessibilityID {
         static let field = "composer.field"
         static let send = "composer.send"
     }
+
+    enum AgentFields {
+        /// The prompt field of the New Workspace sheet.
+        static let prompt = "agentFields.prompt"
+    }
+
+    enum Timeline {
+        /// A reasoning row's disclosure button.
+        static let reasoning = "timeline.reasoning"
+        /// A tool call row's disclosure button.
+        static let toolCall = "timeline.toolCall"
+        /// The disclosure button of consecutive reasoning and tool rows collapsed into one.
+        static let activityGroup = "timeline.activityGroup"
+    }
 }

@@ -211,6 +211,89 @@ private func page(_ entries: String, endSeq: Int, epoch: String = "e1") throws -
     }
 }
 
+private func flattened(_ sections: [TimelineSection]) -> [TimelineRow] {
+    sections.flatMap { section -> [TimelineRow] in
+        switch section {
+        case .row(let row): [row]
+        case .activity(_, let rows): rows
+        }
+    }
+}
+
+private func tool(_ callId: String, status: String = "completed") -> String {
+    #"{"type":"tool_call","callId":"\#(callId)","name":"Bash","status":"\#(status)","error":null,"detail":{"type":"shell","command":"ls"}}"#
+}
+
+@Suite struct TimelineSectionTests {
+    @Test func groupsConsecutiveActivity() throws {
+        var timeline = AgentTimeline()
+        timeline.replace(with: try page(#"{"item":{"type":"user_message","text":"hi"},"seqStart":1,"seqEnd":1}"#, endSeq: 1))
+        _ = timeline.apply(try stream(2, #"{"type":"reasoning","text":"Hmm"}"#))
+        _ = timeline.apply(try stream(3, tool("c1")))
+        _ = timeline.apply(try stream(4, tool("c2", status: "running")))
+        _ = timeline.apply(try stream(5, #"{"type":"assistant_message","text":"Done"}"#))
+        _ = timeline.apply(try stream(6, #"{"type":"reasoning","text":"Again"}"#))
+        let sections = timeline.sections
+        #expect(sections.map(\.id) == ["seq-1", "activity-seq-2", "seq-5", "seq-6"])
+        guard case .activity(_, let rows) = sections[1] else { Issue.record("expected activity"); return }
+        #expect(rows.map(\.id) == ["seq-2", "tool-c1", "tool-c2"])
+        guard case .row(let lone) = sections[3] else { Issue.record("expected a lone row"); return }
+        #expect(lone.kind == .reasoning(text: "Again"))
+    }
+
+    @Test func outputAndStatusRowsBreakRuns() {
+        let call = ToolCall(callId: "c", name: "Bash", status: "completed", detail: ToolCallDetail(type: "shell"))
+        let kinds: [TimelineRow.Kind] = [
+            .reasoning(text: "a"), .todo([]), .tool(call), .error("boom"), .reasoning(text: "b"),
+            .notification(level: "info", message: "n"), .tool(call), .compaction(status: "done"), .reasoning(text: "c"),
+        ]
+        let input = kinds.enumerated().map { TimelineRow(id: "r\($0.offset)", kind: $0.element, timestamp: nil) }
+        let sections = TimelineSection.sections(of: input)
+        #expect(sections.allSatisfy { if case .row = $0 { true } else { false } })
+        #expect(flattened(sections) == input)
+    }
+
+    @Test func emptyTimelineHasNoSections() {
+        #expect(TimelineSection.sections(of: []).isEmpty)
+    }
+
+    @Test func groupKeepsItsIdWhileStreaming() throws {
+        var timeline = AgentTimeline()
+        timeline.replace(with: try page("", endSeq: 0))
+        _ = timeline.apply(try stream(1, #"{"type":"reasoning","text":"Plan"}"#))
+        #expect(timeline.sections.map(\.id) == ["seq-1"])
+        _ = timeline.apply(try stream(2, tool("c1", status: "running")))
+        #expect(timeline.sections.map(\.id) == ["activity-seq-1"])
+        _ = timeline.apply(try stream(3, tool("c1")))
+        _ = timeline.apply(try stream(4, #"{"type":"reasoning","text":"More"}"#))
+        _ = timeline.apply(try stream(5, #"{"type":"reasoning","text":" thought"}"#))
+        let sections = timeline.sections
+        #expect(sections.map(\.id) == ["activity-seq-1"])
+        guard case .activity(_, let rows) = sections[0] else { Issue.record("expected activity"); return }
+        #expect(rows.count == 3)
+        #expect(rows[2].kind == .reasoning(text: "More thought"))
+    }
+
+    /// An authoritative page, then the live tail continuing the same run of work, then the reply.
+    @Test func pageAndLiveTailFormOneGroup() throws {
+        var timeline = AgentTimeline()
+        timeline.replace(with: try page("""
+            {"item":{"type":"user_message","text":"fix it","messageId":"m1"},"seqStart":1,"seqEnd":1},
+            {"item":{"type":"reasoning","text":"Looking"},"seqStart":2,"seqEnd":3},
+            {"item":\(tool("c1")),"seqStart":4,"seqEnd":5}
+            """, endSeq: 5))
+        #expect(timeline.apply(try stream(6, tool("c2", status: "running"))) == .applied)
+        #expect(timeline.apply(try stream(7, tool("c2"))) == .applied)
+        #expect(timeline.apply(try stream(8, #"{"type":"assistant_message","text":"Fixed."}"#)) == .applied)
+        let sections = timeline.sections
+        #expect(sections.map(\.id) == ["seq-1", "activity-seq-2", "seq-8"])
+        guard case .activity(_, let rows) = sections[1] else { Issue.record("expected activity"); return }
+        #expect(rows.map(\.id) == ["seq-2", "tool-c1", "tool-c2"])
+        #expect(rows.allSatisfy { $0.isActivity })
+        #expect(timeline.rows == flattened(sections))
+    }
+}
+
 /// Runs against a real daemon when `PASEO_LIVE_URL` is set (for example `127.0.0.1:6767`).
 /// Read-only: lists workspaces/agents and fetches one timeline.
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["PASEO_LIVE_URL"] != nil))
@@ -236,6 +319,9 @@ struct LiveDaemonTests {
             timeline.replace(with: page)
             print("live: agent \(agent.id) timeline rows \(timeline.rows.count) from \(page.entries.count) entries")
             #expect(timeline.isLoaded)
+            let sections = timeline.sections
+            #expect(flattened(sections) == timeline.rows)
+            for case .activity(_, let rows) in sections { #expect(rows.count > 1 && rows.allSatisfy { $0.isActivity }) }
         }
 
         await #expect(throws: PaseoError.self) {
@@ -353,5 +439,48 @@ struct LiveAgentRoundTripTests {
         try await cleanUp(agent, client: client, preexistingWorkspaces: preexisting)
         #expect(requested != nil, "The provider finished the turn without requesting permission")
         #expect(resolved)
+    }
+
+    @Test(.timeLimit(.minutes(3))) func toolCallsGroupBeforeTheReply() async throws {
+        let (client, preexisting) = try await connectedClient("garbeo-tests-sections")
+        try await client.subscribeToSessionEvents(["agent_permission_request"])
+        let agent = try await createAgent(client, modeId: "default",
+            prompt: "Use the Read tool to read README.md, then use it again to read Package.swift, then reply with exactly: done.")
+
+        var timeline = AgentTimeline()
+        try await client.setTimelineSubscription(agentIds: [agent.id])
+        timeline.replace(with: try await client.fetchTimeline(agentId: agent.id))
+        func replied() -> Bool {
+            timeline.rows.contains { if case .assistant(let text, _) = $0.kind { text.lowercased().contains("done") } else { false } }
+        }
+        for await event in client.events {
+            switch event {
+            case .permissionRequested(let payload) where payload.agentId == agent.id:
+                try await client.respondToPermission(agentId: agent.id, permissionId: payload.request.id, allow: true)
+            case .agentStream(let payload) where payload.agentId == agent.id:
+                if timeline.apply(payload) == .gap {
+                    timeline.replace(with: try await client.fetchTimeline(agentId: agent.id))
+                }
+            case .agentUpdate(.upsert(let updated)) where updated.id == agent.id && updated.status == .idle:
+                timeline.replace(with: try await client.fetchTimeline(agentId: agent.id))
+            default:
+                break
+            }
+            if replied() { break }
+        }
+        // The authoritative projection, as the app shows it after a reload.
+        timeline.replace(with: try await client.fetchTimeline(agentId: agent.id))
+        try await cleanUp(agent, client: client, preexistingWorkspaces: preexisting)
+
+        let sections = timeline.sections
+        print("live-sections: \(sections.map(\.id))")
+        #expect(flattened(sections) == timeline.rows)
+        let groups = sections.compactMap { if case .activity(_, let rows) = $0 { rows } else { nil } }
+        let calls = groups.flatMap { $0 }.filter { if case .tool = $0.kind { true } else { false } }
+        #expect(calls.count >= 2, "Both reads should be inside an activity group")
+        guard case .row(let last) = sections.last, case .assistant(let text, _) = last.kind else {
+            Issue.record("The reply should be the last section, outside any group"); return
+        }
+        #expect(text.lowercased().contains("done"))
     }
 }
