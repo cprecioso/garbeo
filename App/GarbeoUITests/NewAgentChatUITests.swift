@@ -7,10 +7,12 @@ final class NewAgentChatUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// Launches connected to the test daemon with its workspace selected, and presses New Agent.
+    /// Launches connected to the test daemon and presses the sidebar's New Agent, so the chat opens in
+    /// the daemon's only workspace. Nothing is selected first: on iPhone a selection pushes the detail
+    /// over the sidebar and its toolbar.
     private func openNewAgent(daemon: String) throws -> XCUIApplication {
-        let workspace = try LiveDaemon.requireWorkspace()
-        let app = XCUIApplication.launchForTesting(daemon: daemon, arguments: ["-PaseoSelectWorkspace", workspace])
+        _ = try LiveDaemon.requireWorkspace()
+        let app = XCUIApplication.launchForTesting(daemon: daemon)
         let newAgent = app.element(AccessibilityID.Sidebar.newAgent)
         XCTAssertTrue(newAgent.waitForExistence(timeout: 30))
         newAgent.clickOrTap()
