@@ -24,9 +24,9 @@ final class PluginMenuUITests: XCTestCase {
         XCTAssertTrue(openTab.waitForExistence(timeout: 30), "The workspace didn't open")
         open(until: panel, in: app) { openTab.clickOrTap() }
 
-        XCTAssertEqual(app.menuItems.matching(identifier: panel).count, 1)
+        XCTAssertEqual(menuItemsOutsideMenuBar(panel, in: app), 1)
         for command in commands {
-            XCTAssertFalse(app.menuItems[command].exists, "\"\(command)\" is a command, not a tab")
+            XCTAssertEqual(menuItemsOutsideMenuBar(command, in: app), 0, "\"\(command)\" is a command, not a tab")
         }
         #else
         throw XCTSkip("The Open Tab menu is macOS only")
@@ -45,7 +45,7 @@ final class PluginMenuUITests: XCTestCase {
         open(until: panel, in: app) { row.rightClick() }
 
         for command in commands {
-            XCTAssertTrue(app.menuItems[command].exists, "\"\(command)\" is missing from the context menu")
+            XCTAssertEqual(menuItemsOutsideMenuBar(command, in: app), 1, "\"\(command)\" is missing from the context menu")
         }
         #else
         throw XCTSkip("Context menus are covered on macOS")
@@ -53,13 +53,19 @@ final class PluginMenuUITests: XCTestCase {
     }
 
     #if os(macOS)
+    /// Menu items titled `title` in open menus. The menu bar's Plugins menu lists the selected
+    /// workspace's panels and commands too, and its items count even while it's closed.
+    private func menuItemsOutsideMenuBar(_ title: String, in app: XCUIApplication) -> Int {
+        app.menuItems.matching(identifier: title).count - app.menuBars.menuItems.matching(identifier: title).count
+    }
+
     /// Opens a menu until its `item` shows up: plugin contributions arrive once the app's registry page
     /// has run the plugin's client bundle.
     private func open(until item: String, in app: XCUIApplication, with show: () -> Void) {
         let deadline = Date.now.addingTimeInterval(30)
         repeat {
             show()
-            if app.menuItems[item].waitForExistence(timeout: 2) { return }
+            if app.menuItems[item].waitForExistence(timeout: 2), menuItemsOutsideMenuBar(item, in: app) > 0 { return }
             app.typeKey(.escape, modifierFlags: [])
         } while Date.now < deadline
         XCTFail("\"\(item)\" never appeared in the menu")
