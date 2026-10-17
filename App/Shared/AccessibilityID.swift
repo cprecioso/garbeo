@@ -14,4 +14,12 @@ enum AccessibilityID {
     enum Detail {
         static let empty = "detail.empty"
     }
+
+    enum Workspace {
+        static let view = "workspace.view"
+    }
+
+    enum Terminal {
+        static let view = "terminal.view"
+    }
 }

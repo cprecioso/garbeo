@@ -33,10 +33,17 @@ struct GarbeoApp: App {
         }
         #if os(macOS)
         .defaultSize(width: 1180, height: 760)
+        #endif
         .commands {
+            #if os(macOS)
             CommandGroup(after: .appInfo) {
                 CreditsMenuItem()
             }
+            #endif
+            CommandGroup(after: .newItem) {
+                NewTabMenuItem(model: model)
+            }
+            #if os(macOS)
             CommandMenu("Daemon") {
                 Button("Reconnect") { model.retryNow() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
@@ -44,8 +51,8 @@ struct GarbeoApp: App {
                 Button("Disconnect") { model.forgetEndpoint() }
                     .disabled(model.endpoint == nil)
             }
+            #endif
         }
-        #endif
 
         #if os(macOS)
         Window("Credits", id: CreditsMenuItem.windowId) {
@@ -66,6 +73,34 @@ private struct CreditsMenuItem: View {
     }
 }
 #endif
+
+/// ⌘T: a new terminal tab in the focused window's workspace (on iOS, a new terminal shown in the detail).
+private struct NewTabMenuItem: View {
+    let model: AppModel
+    @FocusedValue(\.selectedWorkspace) private var workspace
+
+    var body: some View {
+        Button(newTabTitle) {
+            guard let workspace else { return }
+            Task { await model.openNewTab(in: workspace) }
+        }
+        .keyboardShortcut("t")
+        .disabled(workspace == nil || !model.connection.isConnected)
+    }
+
+    private var newTabTitle: String {
+        #if os(macOS)
+        "New Terminal Tab"
+        #else
+        "New Terminal"
+        #endif
+    }
+}
+
+extension FocusedValues {
+    /// The workspace of the focused window's selection.
+    @Entry var selectedWorkspace: Workspace?
+}
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
@@ -163,6 +198,7 @@ struct MainView: View {
             if selection != nil { model.plugins.activePane = nil }
         }
         .background(PluginRegistryHost())
+        .focusedSceneValue(\.selectedWorkspace, model.selectedWorkspace)
     }
 }
 

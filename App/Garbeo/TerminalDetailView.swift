@@ -65,6 +65,8 @@ struct TerminalDetailView: View {
 
     var body: some View {
         content
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(AccessibilityID.Terminal.view)
             .confirmationDialog("Kill \(terminal.displayName)?", isPresented: $confirmingKill) {
                 Button("Kill Terminal", role: .destructive) {
                     Task { await model.terminals.kill(terminal) }
