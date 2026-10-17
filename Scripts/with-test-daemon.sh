@@ -2,7 +2,8 @@
 # Runs a command against a Paseo daemon: the one in PASEO_LIVE_URL if set, otherwise a throwaway one
 # started here on 127.0.0.1:${PASEO_TEST_PORT:-6871} with its own home and one workspace, and stopped on
 # exit. For a throwaway daemon it also sets PASEO_LIVE_WORKSPACE (that workspace), PASEO_LIVE_THROWAWAY=1
-# and PASEO_LIVE_TERMINALS=1 (tests that change the daemon's state may run). Every PASEO_LIVE_* variable
+# and PASEO_LIVE_TERMINALS=1 (tests that change the daemon's state may run), and PASEO_LIVE_PLUGINS=1 once
+# it has installed Scripts/test-plugin (tests of plugin UI may run). Every PASEO_LIVE_* variable
 # (and PASEO_PASSWORD) is also exported as TEST_RUNNER_*, which xcodebuild hands to its test runners.
 #
 #   Scripts/with-test-daemon.sh swift test --filter Live
@@ -17,6 +18,7 @@ if [ -z "${PASEO_LIVE_URL:-}" ]; then
   fi
 
   home=$(mktemp -d "${TMPDIR:-/tmp}/garbeo-test-daemon.XXXXXX")
+  paseo daemon config set --home "$home" pluginsEnabled true >/dev/null
   echo "Starting a test daemon on $address (home: $home)" >&2
   PASEO_HOME=$home PASEO_LISTEN=$address PASEO_RELAY_ENABLED=false paseo daemon run --home "$home" >"$home/daemon.log" 2>&1 &
   pid=$!
@@ -57,10 +59,25 @@ if [ -z "${PASEO_LIVE_URL:-}" ]; then
     fi
   done
 
+  # A plugin for tests of plugin UI: a workspace panel and workspace commands.
+  plugin=$(cd "$(dirname "$0")" && pwd)/test-plugin
+  paseo plugin install --host "$address" "$plugin" >/dev/null
+  tries=0
+  until paseo plugin ls --host "$address" --json 2>/dev/null | grep -q '"status": *"running"'; do
+    tries=$((tries + 1))
+    if [ $tries -ge 30 ]; then
+      echo "The test plugin didn't start:" >&2
+      paseo plugin ls --host "$address" >&2 || true
+      exit 1
+    fi
+    sleep 1
+  done
+
   export PASEO_LIVE_URL=$address
   export PASEO_LIVE_WORKSPACE=$workspace
   export PASEO_LIVE_THROWAWAY=1
   export PASEO_LIVE_TERMINALS=${PASEO_LIVE_TERMINALS:-1}
+  export PASEO_LIVE_PLUGINS=1
 fi
 
 for name in $(env | sed -nE 's/^(PASEO_LIVE_[A-Z_]*|PASEO_PASSWORD)=.*/\1/p'); do

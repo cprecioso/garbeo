@@ -183,6 +183,7 @@ private struct WorkspaceLabel: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
             Text(workspace.displayName).lineLimit(1)
+                .accessibilityIdentifier(AccessibilityID.Sidebar.workspaceRow)
             Spacer(minLength: 4)
             if showsStatus { WorkspaceStatusIndicator(agents: model.agents(in: workspace)) }
             if let diff = workspace.diffStat, diff.additions + diff.deletions > 0 {

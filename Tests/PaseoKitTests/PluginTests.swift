@@ -123,4 +123,21 @@ struct LivePluginTests {
             _ = try await client.invokePluginRpc(pluginId: "definitely-not-installed", method: "x", input: [:])
         }
     }
+
+    /// `with-test-daemon.sh` installs Scripts/test-plugin (`PASEO_LIVE_PLUGINS=1`); the app's registry
+    /// page runs its client bundle to learn the panel and commands UI tests look for.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["PASEO_LIVE_PLUGINS"] == "1"))
+    func servesTheTestPluginsClientBundle() async throws {
+        let env = ProcessInfo.processInfo.environment
+        let client = DaemonClient(
+            endpoint: DaemonEndpoint(url: env["PASEO_LIVE_URL"]!, password: env["PASEO_PASSWORD"]),
+            clientId: "garbeo-plugin-tests")
+        _ = try await client.connect()
+        defer { Task { await client.disconnect() } }
+        let plugin = try #require(try await client.listPlugins().first { $0.id == "garbeo-test-plugin" })
+        #expect(plugin.status == .running)
+        let entry = try #require(try await client.pluginCatalog().first { $0.id == "garbeo-test-plugin" })
+        #expect(entry.hasClient)
+        #expect(entry.clientBundle.contains("addWorkspacePanel"))
+    }
 }

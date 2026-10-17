@@ -67,6 +67,7 @@ struct WorkspaceView: View {
                 } label: {
                     Label("Open Tab", systemImage: "plus.rectangle.on.rectangle")
                 }
+                .accessibilityIdentifier(AccessibilityID.Workspace.openTabMenu)
                 .help("Open an agent or terminal of this workspace in a tab")
             }
         }
