@@ -26,6 +26,16 @@ extension XCUIApplication {
 }
 
 extension XCUIElement {
+    /// Clicks on macOS, where `tap()` doesn't press SwiftUI buttons, and taps on iOS.
+    @MainActor
+    func clickOrTap() {
+        #if os(macOS)
+        click()
+        #else
+        tap()
+        #endif
+    }
+
     /// Replaces a text field's contents with `text`.
     @MainActor
     func replaceText(_ text: String) {

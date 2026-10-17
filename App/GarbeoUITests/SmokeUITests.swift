@@ -24,7 +24,7 @@ final class SmokeUITests: XCTestCase {
         let address = app.element(AccessibilityID.Connect.address)
         XCTAssertTrue(address.waitForExistence(timeout: 30))
         address.replaceText(url)
-        app.element(AccessibilityID.Connect.connectButton).tap()
+        app.element(AccessibilityID.Connect.connectButton).clickOrTap()
         XCTAssertTrue(app.element(AccessibilityID.Sidebar.list).waitForExistence(timeout: 30))
     }
 }
