@@ -9,7 +9,6 @@ struct ConnectView: View {
     @State private var isConnecting = false
     @State private var inputError: String?
     @State private var showingScanner = false
-    @State private var showingCredits = false
     @State private var localDaemonRunning = false
 
     var body: some View {
@@ -104,12 +103,6 @@ struct ConnectView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 480)
-
-                #if os(iOS)
-                // macOS has Credits in the app menu.
-                Button("Credits") { showingCredits = true }
-                    .font(.footnote)
-                #endif
             }
             .padding(32)
             .frame(maxWidth: .infinity)
@@ -133,7 +126,6 @@ struct ConnectView: View {
         .sheet(isPresented: $showingScanner) {
             QRScannerSheet { link in pairWithLink(link) }
         }
-        .sheet(isPresented: $showingCredits) { CreditsView() }
         #endif
     }
 

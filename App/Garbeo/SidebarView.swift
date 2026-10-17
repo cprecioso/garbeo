@@ -6,9 +6,6 @@ struct SidebarView: View {
     @Binding var showingNewAgent: Bool
     @Binding var showingNewWorkspace: Bool
     @State private var search = ""
-    #if os(iOS)
-    @State private var showingCredits = false
-    #endif
 
     var body: some View {
         List(selection: selection) {
@@ -68,17 +65,12 @@ struct SidebarView: View {
                 Menu {
                     Button("Reconnect", systemImage: "arrow.clockwise") { model.retryNow() }
                     Button("Disconnect", systemImage: "xmark.circle", role: .destructive) { model.forgetEndpoint() }
-                    Divider()
-                    Button("Credits", systemImage: "info.circle") { showingCredits = true }
                 } label: {
                     Label("Daemon", systemImage: "server.rack")
                 }
             }
             #endif
         }
-        #if os(iOS)
-        .sheet(isPresented: $showingCredits) { CreditsView() }
-        #endif
         .refreshable { model.retryNow() }
     }
 
