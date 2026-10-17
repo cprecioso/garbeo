@@ -4,35 +4,6 @@ import PaseoKit
 import SwiftUI
 import WebKit
 
-/// Contribution metadata reported by the registry page after it runs every client bundle.
-struct PluginContributions: Decodable, Identifiable, Hashable {
-    struct Screen: Decodable, Hashable { var id: String; var title: String? }
-    struct SettingsScreen: Decodable, Hashable { var id: String; var title: String; var icon: String }
-    struct Panel: Decodable, Hashable, Identifiable {
-        var id: String
-        var title: String
-        var icon: String
-        var context: String
-        var locations: [String]
-    }
-    struct Command: Decodable, Hashable, Identifiable {
-        var id: String
-        var title: String
-        var icon: String
-        var context: String
-        var keywords: [String]
-    }
-    struct LegacySidebarItem: Decodable, Hashable, Identifiable { var id: String; var title: String; var icon: String; var surface: String }
-
-    var id: String
-    var screens: [Screen]
-    var settingsScreens: [SettingsScreen]
-    var panels: [Panel]
-    var commands: [Command]
-    var legacySidebarItems: [LegacySidebarItem]
-    var unsupported: [String]
-}
-
 /// A row a plugin's sidebar item rendered through `SidebarRow`.
 struct PluginSidebarRow: Decodable, Identifiable, Hashable {
     var key: String
@@ -43,13 +14,6 @@ struct PluginSidebarRow: Decodable, Identifiable, Hashable {
     var icon: String?
     var active: Bool
     var id: String { key }
-}
-
-/// A contribution with the plugin it belongs to; ids are only unique within a plugin.
-struct PluginItem<Item: Identifiable & Hashable>: Identifiable, Hashable where Item.ID == String {
-    var pluginId: String
-    var item: Item
-    var id: String { "\(pluginId)/\(item.id)" }
 }
 
 struct PluginFailure: Decodable, Hashable { var pluginId: String; var message: String }
@@ -251,15 +215,11 @@ final class PluginStore {
 
     /// Panels that can open for a workspace (and, for agent panels, a given agent).
     func panels(agent: Bool) -> [PluginItem<PluginContributions.Panel>] {
-        contributions.flatMap { plugin in
-            plugin.panels.filter { ($0.context == "agent") == agent }.map { PluginItem(pluginId: plugin.id, item: $0) }
-        }
+        contributions.panels(agent: agent)
     }
 
     func commands(context: String) -> [PluginItem<PluginContributions.Command>] {
-        contributions.flatMap { plugin in
-            plugin.commands.filter { $0.context == context }.map { PluginItem(pluginId: plugin.id, item: $0) }
-        }
+        contributions.commands(context: context)
     }
 
     // MARK: Registry interactions

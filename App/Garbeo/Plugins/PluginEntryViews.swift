@@ -5,6 +5,7 @@ import SwiftUI
 // - sidebar items (rendered by the plugin, drawn as native rows), legacy sidebar items and
 //   global Command Center items in a "Plugins" sidebar section;
 // - workspace panels and workspace commands in a workspace's context menu;
+// - workspace panels alone in a workspace's Open Tab menu;
 // - workspace/agent panels and commands in the agent toolbar's Plugins menu.
 
 struct PluginSidebarSection: View {
@@ -68,24 +69,25 @@ private struct PluginRowButton: View {
     }
 }
 
-/// Context menu entries for a workspace row.
+/// Plugin entries of a workspace's context menu, or of its Open Tab menu (`opensTabs`), which
+/// leaves out commands; see `PluginWorkspaceMenu`.
 struct PluginWorkspaceMenuItems: View {
     @Environment(AppModel.self) private var model
     let workspaceId: String
+    var opensTabs = false
 
     var body: some View {
         let plugins = model.plugins
-        let panels = plugins.panels(agent: false)
-        let commands = plugins.commands(context: "workspace")
-        if !panels.isEmpty || !commands.isEmpty {
+        let menu = PluginWorkspaceMenu(plugins.contributions, opensTabs: opensTabs)
+        if !menu.isEmpty {
             Section("Plugins") {
-                ForEach(panels) { entry in
+                ForEach(menu.panels) { entry in
                     let (pluginId, panel) = (entry.pluginId, entry.item)
                     Button(panel.title, systemImage: LucideSymbols.symbol(for: panel.icon)) {
                         plugins.open(.panel(pluginId: pluginId, panelId: panel.id, workspaceId: workspaceId))
                     }
                 }
-                ForEach(commands) { entry in
+                ForEach(menu.commands) { entry in
                     let (pluginId, command) = (entry.pluginId, entry.item)
                     Button(command.title, systemImage: LucideSymbols.symbol(for: command.icon)) {
                         plugins.runCommand(pluginId: pluginId, commandId: command.id, workspaceId: workspaceId)

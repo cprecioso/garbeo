@@ -63,7 +63,7 @@ struct WorkspaceView: View {
                             Task { await model.terminals.create(in: workspace) }
                         }
                     }
-                    PluginWorkspaceMenuItems(workspaceId: workspace.id)
+                    PluginWorkspaceMenuItems(workspaceId: workspace.id, opensTabs: true)
                 } label: {
                     Label("Open Tab", systemImage: "plus.rectangle.on.rectangle")
                 }

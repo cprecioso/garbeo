@@ -51,6 +51,53 @@ private func payload<P: Decodable>(_ json: String, as type: P.Type) throws -> P 
     }
 }
 
+/// What the registry page reports (PluginHost/src/main.tsx `reportContributions`) for
+/// cprecioso/paseo-gh-stack, which adds a "Stack" panel and three workspace commands, one of which
+/// just opens that panel.
+private let ghStackContributions = """
+[{"id":"gh-stack","screens":[],"settingsScreens":[],
+  "panels":[{"id":"stack","title":"Stack","icon":"Layers","context":"workspace","locations":["workspace","explorer"]}],
+  "commands":[
+    {"id":"open-stack","title":"Open stack","icon":"Layers","context":"workspace","keywords":["gh","stack"]},
+    {"id":"stack-up","title":"Stack: check out branch above","icon":"ArrowUp","context":"workspace","keywords":[]},
+    {"id":"stack-down","title":"Stack: check out branch below","icon":"ArrowDown","context":"workspace","keywords":[]}],
+  "legacySidebarItems":[],"sidebarItems":[],"unsupported":[]}]
+"""
+
+@Suite struct PluginWorkspaceMenuTests {
+    private func contributions(_ json: String) throws -> [PluginContributions] {
+        try JSONDecoder().decode([PluginContributions].self, from: Data(json.utf8))
+    }
+
+    @Test func openTabMenuListsOnlyPanels() throws {
+        let menu = PluginWorkspaceMenu(try contributions(ghStackContributions), opensTabs: true)
+        #expect(menu.panels.map(\.id) == ["gh-stack/stack"])
+        #expect(menu.commands.isEmpty)
+    }
+
+    @Test func contextMenuListsPanelsAndCommands() throws {
+        let menu = PluginWorkspaceMenu(try contributions(ghStackContributions), opensTabs: false)
+        #expect(menu.panels.map(\.id) == ["gh-stack/stack"])
+        #expect(menu.commands.map(\.id) == ["gh-stack/open-stack", "gh-stack/stack-up", "gh-stack/stack-down"])
+    }
+
+    @Test func openTabMenuSkipsPanelsOutsideTheWorkspace() throws {
+        let menu = PluginWorkspaceMenu(try contributions("""
+        [{"id":"files","screens":[],"settingsScreens":[],"legacySidebarItems":[],"unsupported":[],"commands":[],"panels":[
+          {"id":"tree","title":"Tree","icon":"Folder","context":"workspace","locations":["explorer"]},
+          {"id":"notes","title":"Notes","icon":"Notebook","context":"workspace","locations":["workspace"]},
+          {"id":"usage","title":"Usage","icon":"Gauge","context":"agent","locations":["workspace"]}]}]
+        """), opensTabs: true)
+        #expect(menu.panels.map(\.id) == ["files/notes"])
+    }
+
+    @Test func emptyWithoutWorkspaceContributions() throws {
+        let gh = try contributions(ghStackContributions)
+        #expect(PluginWorkspaceMenu([], opensTabs: false).isEmpty)
+        #expect(!PluginWorkspaceMenu(gh, opensTabs: true).isEmpty)
+    }
+}
+
 /// Read-only plugin probes against a running daemon (`PASEO_LIVE_URL`). If the daemon has the
 /// `local-example` plugin from getpaseo/paseo's plugin-examples installed, also round-trips its
 /// `increment` RPC, which only computes a value.
