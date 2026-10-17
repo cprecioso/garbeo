@@ -11,6 +11,7 @@ enum AccessibilityID {
         static let list = "sidebar.list"
         static let workspaceRow = "sidebar.workspaceRow"
         static let newProject = "sidebar.newProject"
+        static let newAgent = "sidebar.newAgent"
 
         /// A project's section header, by the project's name.
         static func project(_ name: String) -> String { "sidebar.project.\(name)" }
@@ -34,5 +35,21 @@ enum AccessibilityID {
 
     enum Terminal {
         static let view = "terminal.view"
+    }
+
+    enum NewAgent {
+        /// Shown until the first message is sent.
+        static let placeholder = "newAgent.placeholder"
+        static let workspace = "newAgent.workspace"
+        static let provider = "newAgent.provider"
+        static let model = "newAgent.model"
+        static let mode = "newAgent.mode"
+        static let error = "newAgent.error"
+    }
+
+    /// The message field of an agent or new agent chat.
+    enum Composer {
+        static let field = "composer.field"
+        static let send = "composer.send"
     }
 }

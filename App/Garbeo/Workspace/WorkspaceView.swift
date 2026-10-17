@@ -8,7 +8,6 @@ struct WorkspaceView: View {
     @Environment(AppModel.self) private var model
     let workspace: Workspace
     let tabs: WorkspaceTabs
-    @Binding var showingNewAgent: Bool
     @State private var pendingClose: PendingClose?
     /// Tabs being closed; a subagent's tab stays open until the daemon accepts it's no longer shown.
     @State private var closing: Set<WorkspaceTabContent> = []
@@ -33,7 +32,7 @@ struct WorkspaceView: View {
                     .simultaneousGesture(TapGesture().onEnded { tabs.controller.focusPane(paneId) })
             }
         } emptyPane: { paneId in
-            EmptyWorkspacePane(workspace: workspace, tabs: tabs, paneId: paneId, showingNewAgent: $showingNewAgent)
+            EmptyWorkspacePane(workspace: workspace, tabs: tabs, paneId: paneId)
                 .environment(model)
         }
         .safeAreaInset(edge: .top, spacing: 0) { WorkspaceSetupBanner(workspace: workspace) }
@@ -229,7 +228,6 @@ private struct EmptyWorkspacePane: View {
     let workspace: Workspace
     let tabs: WorkspaceTabs
     let paneId: PaneID
-    @Binding var showingNewAgent: Bool
 
     var body: some View {
         let agents = model.agents(in: workspace)
@@ -261,7 +259,7 @@ private struct EmptyWorkspacePane: View {
                 }
             }
             HStack {
-                Button("New Agent") { showingNewAgent = true }
+                Button("New Agent") { model.startNewAgent(in: workspace) }
                 if tabs.controller.allPaneIds.count > 1 {
                     Button("Close Pane") { tabs.controller.closePane(paneId) }
                 }

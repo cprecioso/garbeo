@@ -1,7 +1,7 @@
 import PaseoKit
 import SwiftUI
 
-/// Agent settings being filled in by the New Agent and New Workspace sheets.
+/// Agent settings being filled in for a new agent (a new agent chat, the New Workspace sheet).
 @MainActor @Observable
 final class AgentDraft {
     var providers: [ProviderAvailability] = []

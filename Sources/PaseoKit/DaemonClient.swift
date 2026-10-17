@@ -515,21 +515,27 @@ extension DaemonClient {
             self.thinkingOptionId = thinkingOptionId
             self.prompt = prompt
         }
+
+        /// The request, `prompt` being the agent's first message.
+        func message(clientMessageId: String) -> [String: JSONValue] {
+            var config: [String: JSONValue] = ["provider": .string(provider), "cwd": .string(cwd)]
+            if let model { config["model"] = .string(model) }
+            if let modeId { config["modeId"] = .string(modeId) }
+            if let thinkingOptionId { config["thinkingOptionId"] = .string(thinkingOptionId) }
+            var message: [String: JSONValue] = [
+                "type": "create_agent_request",
+                "config": .object(config),
+                "initialPrompt": .string(prompt),
+                "clientMessageId": .string(clientMessageId),
+                "labels": [:],
+            ]
+            if let workspaceId { message["workspaceId"] = .string(workspaceId) }
+            return message
+        }
     }
 
     public func createAgent(_ options: CreateAgentOptions) async throws -> Agent {
-        var config: [String: JSONValue] = ["provider": .string(options.provider), "cwd": .string(options.cwd)]
-        if let model = options.model { config["model"] = .string(model) }
-        if let modeId = options.modeId { config["modeId"] = .string(modeId) }
-        if let thinking = options.thinkingOptionId { config["thinkingOptionId"] = .string(thinking) }
-        var message: [String: JSONValue] = [
-            "type": "create_agent_request",
-            "config": .object(config),
-            "initialPrompt": .string(options.prompt),
-            "clientMessageId": .string(UUID().uuidString.lowercased()),
-            "labels": [:],
-        ]
-        if let workspaceId = options.workspaceId { message["workspaceId"] = .string(workspaceId) }
+        let message = options.message(clientMessageId: UUID().uuidString.lowercased())
         let payload = try await request(message, as: AgentCreatedPayload.self, timeout: .seconds(120))
         guard payload.status == "agent_created", let agent = payload.agent else {
             throw PaseoError.rpc(payload.error ?? "Agent creation failed")
