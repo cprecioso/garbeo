@@ -54,11 +54,16 @@ Tests/GarbeoTerminalTests/ SwiftTerm behavior the terminal session relies on, re
 Tests/GarbeoSyntaxTests/ every grammar downloads and highlights a sample; precedence, injections, diffs, language detection
 Scripts/generate-relay-vectors.mjs  regenerates the relay vectors (instructions inside)
 scripts/generate-terminal-vectors.mts  regenerates the terminal vectors
-App/Garbeo.xcodeproj     multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only)
+App/Garbeo.xcodeproj     multiplatform SwiftUI app target (Textual for markdown; Bonsplit linked on macOS only), GarbeoTests, GarbeoUITests
 App/Garbeo/              views + AppModel (observable store), HostStore (saved hosts), QR scanner, credits (keep CreditsView in step with dependencies)
   Workspace/             workspace tabs: tab content model, saved layout, Bonsplit integration (macOS)
   Plugins/               PluginStore, WKWebView runtime + bridge, PluginPaneView, PluginTab, sidebar/menu entries
   PluginHost/plugin-host.js  generated JS host runtime (do not edit)
+  LaunchOptions.swift    test isolation: -GarbeoEphemeral (UserDefaults.app, in-memory Keychain), -PaseoConnect
+App/Shared/              AccessibilityID: identifiers shared by the app and its UI tests
+App/GarbeoTests/         unit tests hosted in the app (@testable import Garbeo)
+App/GarbeoUITests/       XCUITests; Harness/ has launchForTesting, element(_:), clickOrTap, replaceText, LiveDaemon
+Scripts/with-test-daemon.sh  runs a command against a throwaway daemon (e2e and UI tests)
 PluginHost/              source of the JS host runtime (React, react-native-web, Paseo plugin SDK)
 ```
 
@@ -96,8 +101,24 @@ Requires Xcode 27+, macOS 27 / iOS 27.
 
 ## Tests
 
+CI (`.github/workflows/ci.yaml`) runs every level on pull requests and pushes to `main`, macOS and iOS Simulator. Locally:
+
 ```sh
-swift test                                      # unit tests (PaseoKit + GarbeoTerminal)
+mise run test:unit              # SwiftPM unit tests (swift test)
+mise run test:e2e               # SwiftPM live tests (--filter Live) against a throwaway daemon
+mise run //App:test:unit:mac    # app unit tests (App/GarbeoTests, hosted in the app); also :ios
+mise run //App:test:ui:mac      # XCUITests (App/GarbeoUITests) against a throwaway daemon; also :ios
+mise run test                   # all of the above, macOS only
+```
+
+`Scripts/with-test-daemon.sh` starts the throwaway daemon (needs `paseo` on the `PATH`) on `127.0.0.1:6871` (`PASEO_TEST_PORT`) with its own home and one workspace, sets `PASEO_LIVE_URL`, `PASEO_LIVE_WORKSPACE`, `PASEO_LIVE_THROWAWAY=1` and `PASEO_LIVE_TERMINALS=1`, and passes them on to XCUITests as `TEST_RUNNER_*`. With `PASEO_LIVE_URL` already set it uses that daemon instead and starts nothing. Tests that need a daemon skip without one. The iOS tasks run on `IOS_SIMULATOR` (default `iPhone 17`); results land in `App/build/results`. macOS XCUITests need Automation Mode, which asks for authentication the first time.
+
+UI tests launch the app with `XCUIApplication.launchForTesting(daemon:arguments:)` (`App/GarbeoUITests/Harness`): `-GarbeoEphemeral YES` keeps settings in a throwaway domain and secrets in memory, so the app never sees or changes your saved hosts, and `-PaseoConnect <address>` connects on launch. Use `LiveDaemon.require()` for the daemon's address (skips without one) and `LiveDaemon.requireThrowaway()` before changing its state. Find elements by accessibility identifier: add a constant to `App/Shared/AccessibilityID.swift` (`<area>.<element>`, shared by the app and the UI tests), set it with `.accessibilityIdentifier(…)`, and look it up with `app.element(AccessibilityID.….…)`. Press buttons with `clickOrTap()` (`tap()` doesn't press SwiftUI buttons on macOS).
+
+The live SwiftPM tests can also target a daemon of your own:
+
+```sh
+swift test                                      # unit tests (PaseoKit + GarbeoTerminal + GarbeoSyntax)
 PASEO_LIVE_URL=127.0.0.1:6767 swift test        # + read-only checks against a running daemon (incl. plugin list/catalog)
 PASEO_LIVE_URL=127.0.0.1:6767 PASEO_LIVE_WRITE=1 swift test   # + creates real agents (cheap model)
 ```
@@ -179,6 +200,8 @@ cd PluginHost && npm install && PASEO_SRC=/tmp/paseo-src/paseo npm run build
 
 ## Debug aids (DEBUG builds)
 
+- `-PaseoConnect <address>` connects directly to a daemon on launch
+- `-GarbeoEphemeral YES` starts from empty settings that aren't saved, and keeps passwords and keys out of the Keychain
 - `-PaseoSelectAgent first|<agentId>` opens an agent on launch
 - `-PaseoPairingLink <url>` pairs with a relay pairing link and connects on launch
 - `-PaseoSelectTerminal first|<terminalId>|new` opens a terminal on launch (`new` creates one in the first workspace; throwaway daemons only)

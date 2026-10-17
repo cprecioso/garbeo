@@ -95,6 +95,10 @@ final class WebHighlighter {
 
     private struct UnexpectedResult: Error {}
     private struct GrammarNotLoaded: Error {}
+    private struct PageNotReady: Error, CustomStringConvertible {
+        var resources: String
+        var description: String { "The highlighter page didn't start (loaded: \(resources))" }
+    }
 
     private static func isScriptError(_ error: any Error) -> Bool {
         error is UnexpectedResult || (error as? WKError)?.code == .javaScriptExceptionOccurred
@@ -111,7 +115,14 @@ final class WebHighlighter {
             page.isInspectable = true
             #endif
             for try await _ in page.load(URL(string: "\(PageScheme.scheme)://host/index.html")!) {}
-            return page
+            // The navigation can finish before the module script has run.
+            for _ in 0..<100 {
+                if try await page.callJavaScript("return typeof garbeoSyntax") as? String == "object" { return page }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            let resources = try? await page.callJavaScript(
+                "return performance.getEntriesByType('resource').map(e => `${e.name} ${e.responseStatus}`).join(', ')")
+            throw PageNotReady(resources: resources as? String ?? "?")
         }
         page = task
         do {

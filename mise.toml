@@ -13,3 +13,34 @@ experimental = true
 [task_templates.fastlane]
 run = "bundle exec fastlane {{ vars.lane }}"
 vars = { lane = "" }
+
+# App test bundles through xcodebuild, run from App/. `target` is GarbeoTests (unit tests hosted in the app)
+# or GarbeoUITests. On CI (no signing certificates) everything is signed to run locally.
+[task_templates.xcodebuild-test]
+run = """
+rm -rf "build/results/{{ vars.target }}-{{ vars.platform }}.xcresult"
+{{ vars.wrapper }} xcodebuild test -project Garbeo.xcodeproj -scheme Garbeo \
+  -destination "{{ vars.destination }}" -only-testing:{{ vars.target }} \
+  -derivedDataPath build/DerivedData -resultBundlePath "build/results/{{ vars.target }}-{{ vars.platform }}.xcresult" \
+  -skipPackagePluginValidation -skipMacroValidation \
+  ${CI:+CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=}
+"""
+vars = { target = "", platform = "", destination = "", wrapper = "" }
+
+[tasks.test]
+description = "Every test level, on macOS"
+run = [
+  "mise run test:unit",
+  "mise run test:e2e",
+  "mise run //App:test:unit:mac",
+  "mise run //App:test:ui:mac",
+]
+
+[tasks."test:unit"]
+description = "SwiftPM unit tests (PaseoKit, GarbeoTerminal, GarbeoSyntax)"
+run = "swift test"
+
+[tasks."test:e2e"]
+description = "SwiftPM live tests against a throwaway daemon (or PASEO_LIVE_URL)"
+run = "Scripts/with-test-daemon.sh swift test --filter Live"
+

@@ -66,7 +66,7 @@ final class AppModel {
     @ObservationIgnored private var subscriptionSync: TimelineSubscriptionSync!
 
     init() {
-        let defaults = UserDefaults.standard
+        let defaults = UserDefaults.app
         if let existing = defaults.string(forKey: "clientId") {
             clientId = existing
         } else {

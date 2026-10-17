@@ -1,0 +1,99 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+name: Continuous Integration
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The daemon the e2e and UI tests start (Scripts/with-test-daemon.sh)
+  PASEO_VERSION: 0.11.4
+
+jobs:
+  package:
+    name: package (unit + e2e)
+    runs-on: xcode-27
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+
+      - uses: actions/cache@v6
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}-${{ hashFiles('Package.swift', 'Sources/**', 'Tests/**') }}
+          restore-keys: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}-
+
+      # GarbeoSyntaxTests download every grammar
+      - uses: actions/cache@v6
+        with:
+          path: ~/Library/Caches/*/Grammars
+          key: grammars-${{ hashFiles('Sources/GarbeoSyntax/Grammars.swift') }}
+
+      - name: Install Paseo
+        run: npm install --global "@getpaseo/cli@$PASEO_VERSION"
+
+      - name: Unit tests
+        run: mise run test:unit
+
+      - name: E2E tests
+        run: mise run test:e2e
+
+  app:
+    name: app (${{ matrix.platform }})
+    runs-on: xcode-27
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [mac, ios]
+
+    defaults:
+      run:
+        working-directory: App
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+        with:
+          working_directory: App
+
+      - uses: actions/cache@v6
+        with:
+          path: App/build/DerivedData/SourcePackages
+          key: xcode-packages-${{ hashFiles('Package.resolved', 'App/Garbeo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
+      - name: Install Paseo
+        run: npm install --global "@getpaseo/cli@$PASEO_VERSION"
+
+      - name: Pick an iOS simulator
+        if: matrix.platform == 'ios'
+        run: |
+          name=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [^(]*[^ (]')
+          echo "Using $name"
+          echo "IOS_SIMULATOR=$name" >> "$GITHUB_ENV"
+
+      - name: Unit tests
+        run: mise run //App:test:unit:${{ matrix.platform }}
+
+      - name: UI tests
+        run: mise run //App:test:ui:${{ matrix.platform }}
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: test-results-${{ matrix.platform }}
+          path: App/build/results
+          if-no-files-found: ignore

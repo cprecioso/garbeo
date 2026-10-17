@@ -41,6 +41,7 @@ struct ConnectView: View {
 
                     Section {
                         TextField("Address or pairing link", text: $address, prompt: Text(verbatim: "127.0.0.1:6767 or https://app.paseo.sh/#offer=…"))
+                            .accessibilityIdentifier(AccessibilityID.Connect.address)
                             .textContentType(.URL)
                             .autocorrectionDisabled()
                             #if os(iOS)
@@ -78,6 +79,7 @@ struct ConnectView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier(AccessibilityID.Connect.connectButton)
                     .disabled(address.trimmingCharacters(in: .whitespaces).isEmpty || isConnecting)
 
                     HStack(spacing: 12) {
@@ -114,6 +116,7 @@ struct ConnectView: View {
             .padding(32)
             .frame(maxWidth: .infinity)
         }
+        .accessibilityIdentifier(AccessibilityID.Connect.screen)
         .onAppear {
             if let endpoint = model.endpoint, endpoint.transportKind == .direct {
                 address = endpoint.url

@@ -37,7 +37,7 @@ final class HostStore {
     private(set) var currentId: String?
 
     private init() {
-        let defaults = UserDefaults.standard
+        let defaults = UserDefaults.app
         if let data = defaults.data(forKey: Self.hostsKey),
            let decoded = try? JSONDecoder().decode([SavedHost].self, from: data)
         {
@@ -120,14 +120,14 @@ final class HostStore {
     }
 
     private func persist() {
-        let defaults = UserDefaults.standard
+        let defaults = UserDefaults.app
         if let data = try? JSONEncoder().encode(hosts) { defaults.set(data, forKey: Self.hostsKey) }
         defaults.set(currentId, forKey: Self.currentKey)
     }
 
     /// Earlier builds stored a single direct URL, with its password keyed by that URL.
     private func migrateLegacyEndpoint() {
-        let defaults = UserDefaults.standard
+        let defaults = UserDefaults.app
         guard let url = defaults.string(forKey: Self.legacyEndpointKey) else { return }
         let password = Keychain.password(for: url)
         Keychain.setPassword(nil, for: url)
