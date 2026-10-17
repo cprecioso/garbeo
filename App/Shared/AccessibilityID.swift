@@ -9,6 +9,14 @@ enum AccessibilityID {
 
     enum Sidebar {
         static let list = "sidebar.list"
+        static let newProject = "sidebar.newProject"
+    }
+
+    enum NewProject {
+        static let path = "newProject.path"
+        static let name = "newProject.name"
+        static let error = "newProject.error"
+        static let create = "newProject.create"
     }
 
     enum Detail {

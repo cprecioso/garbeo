@@ -37,6 +37,9 @@ struct GarbeoApp: App {
             CommandGroup(after: .appInfo) {
                 CreditsMenuItem()
             }
+            CommandGroup(after: .newItem) {
+                NewProjectMenuItem()
+            }
             CommandMenu("Daemon") {
                 Button("Reconnect") { model.retryNow() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
@@ -66,6 +69,23 @@ private struct CreditsMenuItem: View {
     }
 }
 #endif
+
+#if os(macOS)
+private struct NewProjectMenuItem: View {
+    @FocusedBinding(\.showingNewProject) private var showingNewProject
+
+    var body: some View {
+        Button("New Project…") { showingNewProject = true }
+            .keyboardShortcut("n", modifiers: [.command, .option])
+            .disabled(showingNewProject == nil)
+    }
+}
+#endif
+
+extension FocusedValues {
+    /// Presents the New Project sheet of the focused window, while it is connected.
+    @Entry var showingNewProject: Binding<Bool>?
+}
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
@@ -99,6 +119,7 @@ struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var showingNewAgent = false
     @State private var showingNewWorkspace = false
+    @State private var showingNewProject = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     #if os(macOS)
     @State private var workspaceTabs = WorkspaceTabsRegistry()
@@ -109,7 +130,9 @@ struct MainView: View {
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+            SidebarView(
+                showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace,
+                showingNewProject: $showingNewProject)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             #if os(macOS)
@@ -127,7 +150,9 @@ struct MainView: View {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
-                EmptyDetailView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+                EmptyDetailView(
+                    showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace,
+                    showingNewProject: $showingNewProject)
             }
             #else
             if let pane = model.plugins.activePane, sizeClass != .compact {
@@ -139,7 +164,9 @@ struct MainView: View {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
-                EmptyDetailView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+                EmptyDetailView(
+                    showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace,
+                    showingNewProject: $showingNewProject)
             }
             #endif
         }
@@ -149,6 +176,10 @@ struct MainView: View {
         .sheet(isPresented: $showingNewWorkspace) {
             NewWorkspaceView()
         }
+        .sheet(isPresented: $showingNewProject) {
+            NewProjectView()
+        }
+        .focusedSceneValue(\.showingNewProject, model.connection.isConnected ? $showingNewProject : nil)
         #if os(iOS)
         // Compact iPhone layouts show the sidebar alone, so plugin panes open as a sheet there.
         .sheet(item: Binding(
@@ -170,6 +201,7 @@ struct EmptyDetailView: View {
     @Environment(AppModel.self) private var model
     @Binding var showingNewAgent: Bool
     @Binding var showingNewWorkspace: Bool
+    @Binding var showingNewProject: Bool
 
     var body: some View {
         ContentUnavailableView {
@@ -184,6 +216,7 @@ struct EmptyDetailView: View {
             Button("New Agent") { showingNewAgent = true }
                 .buttonStyle(.borderedProminent)
             Button("New Workspace") { showingNewWorkspace = true }
+            Button("New Project") { showingNewProject = true }
         }
         .accessibilityIdentifier(AccessibilityID.Detail.empty)
     }

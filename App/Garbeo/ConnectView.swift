@@ -244,8 +244,9 @@ private enum LocalDaemon {
 
     /// Whether a saved host already points at the local daemon (`localhost:6767`, `ws://127.0.0.1:6767/ws`, …).
     static func matches(_ host: SavedHost) -> Bool {
-        guard host.kind == .direct, let url = try? DaemonEndpoint(url: host.address).webSocketURL() else { return false }
-        return ["127.0.0.1", "localhost", "::1"].contains(url.host() ?? "") && url.port == 6767
+        let endpoint = DaemonEndpoint(url: host.address)
+        guard host.kind == .direct, endpoint.isLoopback else { return false }
+        return (try? endpoint.webSocketURL())?.port == 6767
     }
 }
 

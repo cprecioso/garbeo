@@ -543,6 +543,31 @@ final class AppModel {
         return try await client.branchSuggestions(cwd: cwd, query: query)
     }
 
+    /// Adds a directory on the daemon's machine as a project and selects its workspace there. A
+    /// directory already in a project selects that one. When `name` is given and differs, renames
+    /// the project too. Throws only if the project wasn't added.
+    func createProject(at path: ProjectPath, name: String? = nil) async throws {
+        guard let client else { throw PaseoError.disconnected }
+        let workspace = try await client.openProject(path)
+        workspaces[workspace.id] = workspace
+        Task { await terminals.observe(workspace) }
+        selection = .workspace(workspace.id)
+        guard let name, !name.isEmpty, name != workspace.projectName else { return }
+        do {
+            let customName = try await client.renameProject(projectId: workspace.projectId, to: name)
+            for (id, other) in workspaces where other.projectId == workspace.projectId {
+                workspaces[id]?.projectCustomName = customName
+            }
+        } catch {
+            lastError = "The project was added, but could not be renamed: \(error.localizedDescription)"
+        }
+    }
+
+    func directorySuggestions(query: String) async throws -> [String] {
+        guard let client else { throw PaseoError.disconnected }
+        return try await client.directorySuggestions(query: query)
+    }
+
     private func perform(_ action: (DaemonClient) async throws -> Void) async {
         guard let client else {
             lastError = PaseoError.disconnected.localizedDescription

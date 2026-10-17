@@ -14,6 +14,7 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Send messages (optimistic, confirmed when the daemon echoes them), stop a running turn, change permission mode, archive
 - Answer permission requests inline (provider-supplied actions or Allow/Deny)
 - Create agents: workspace, provider, model, thinking level, mode, prompt
+- Create projects from a directory on the daemon's machine (sidebar toolbar, File ▸ New Project…, ⌥⌘N), with an optional name. The path field suggests the daemon's directories; a daemon on this Mac also offers a folder picker
 - Create workspaces: a new worktree branching off a ref (default: the project's default branch), or checking out an existing branch or pull request, optionally named and with a first agent. Branch fields suggest the repository's branches. The New Agent sheet can also create its worktree
 - Workspace setup progress: live status of the project's setup scripts above the workspace's tabs (macOS) or in its sidebar section (iOS), with per-command output, and approval for setups blocked on a fork pull request's code
 - Workspace terminals: tabs of their workspace on macOS, listed per workspace in the sidebar on iOS (live via `terminals_changed`), opened in a real terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with keyboard input, screen restore on attach, resize, new and kill. On iOS, SwiftTerm's accessory bar provides esc, ctrl, tab, and arrow keys
@@ -38,6 +39,7 @@ Sources/PaseoKit/
   Terminals.swift        terminal requests, slot-routed output streams
   Plugins.swift          plugin list/catalog/RPC requests and catalog-change events
   Worktrees.swift        worktree creation, setup progress, branch suggestions
+  Projects.swift         adding and renaming projects, directory suggestions
 Sources/GarbeoTerminal/  GarbeoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
 Sources/GarbeoSyntax/
   SyntaxLanguage.swift   languages; detection from file paths and markdown fence names

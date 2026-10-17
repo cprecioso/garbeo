@@ -31,6 +31,15 @@ private func page(_ entries: String, endSeq: Int, epoch: String = "e1") throws -
     @Test func rejectsGarbage() {
         #expect(throws: PaseoError.self) { try DaemonEndpoint(url: "ftp://x").webSocketURL() }
     }
+
+    @Test func detectsLoopback() {
+        #expect(DaemonEndpoint(url: "127.0.0.1:6767").isLoopback)
+        #expect(DaemonEndpoint(url: "ws://localhost:4000/ws").isLoopback)
+        #expect(DaemonEndpoint(url: "ws://[::1]:6767/ws").isLoopback)
+        #expect(!DaemonEndpoint(url: "https://box.ts.net").isLoopback)
+        #expect(!DaemonEndpoint(url: "192.168.1.2:6767").isLoopback)
+        #expect(!DaemonEndpoint(url: "ftp://x").isLoopback)
+    }
 }
 
 @Suite struct PaseoDateTests {
