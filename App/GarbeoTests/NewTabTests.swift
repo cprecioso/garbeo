@@ -20,7 +20,7 @@ import Testing
     }
 
     @Test func createsATerminalInTheWorkspaceAndSelectsIt() async throws {
-        let daemon = FakeDaemon()
+        let daemon = FakeTerminalDaemon()
         let client = DaemonClient(
             endpoint: DaemonEndpoint(url: "ws://fake.invalid"), clientId: "cid_test", transportFactory: { daemon })
         try await client.connect()
@@ -58,7 +58,7 @@ private func agent(_ id: String, in workspaceId: String) throws -> Agent {
 }
 
 /// An in-memory daemon: answers the hello and the terminal requests, and records every request.
-private final class FakeDaemon: DaemonTransport, @unchecked Sendable {
+private final class FakeTerminalDaemon: DaemonTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var received: [[String: Any]] = []
     private let inbound = AsyncThrowingStream.makeStream(of: TransportMessage.self)
