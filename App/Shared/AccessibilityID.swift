@@ -10,6 +10,17 @@ enum AccessibilityID {
     enum Sidebar {
         static let list = "sidebar.list"
         static let workspaceRow = "sidebar.workspaceRow"
+        static let newProject = "sidebar.newProject"
+
+        /// A project's section header, by the project's name.
+        static func project(_ name: String) -> String { "sidebar.project.\(name)" }
+    }
+
+    enum NewProject {
+        static let path = "newProject.path"
+        static let name = "newProject.name"
+        static let error = "newProject.error"
+        static let create = "newProject.create"
     }
 
     enum Detail {
@@ -17,11 +28,8 @@ enum AccessibilityID {
     }
 
     enum Workspace {
-        static let openTabMenu = "workspace.openTabMenu"
-    }
-
-    enum Workspace {
         static let view = "workspace.view"
+        static let openTabMenu = "workspace.openTabMenu"
     }
 
     enum Terminal {

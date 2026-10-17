@@ -5,6 +5,7 @@ struct SidebarView: View {
     @Environment(AppModel.self) private var model
     @Binding var showingNewAgent: Bool
     @Binding var showingNewWorkspace: Bool
+    @Binding var showingNewProject: Bool
     @State private var search = ""
     #if os(iOS)
     @State private var showingCredits = false
@@ -18,7 +19,7 @@ struct SidebarView: View {
             ForEach(model.projects) { project in
                 let workspaces = project.workspaces.filter { matches($0) }
                 if !workspaces.isEmpty {
-                    Section(project.name) {
+                    Section {
                         ForEach(workspaces) { workspace in
                             #if os(macOS)
                             // A workspace's agents and terminals are its tabs, not sidebar rows.
@@ -30,6 +31,9 @@ struct SidebarView: View {
                                 terminals: model.terminals.terminals(in: workspace).filter(matches))
                             #endif
                         }
+                    } header: {
+                        Text(project.name)
+                            .accessibilityIdentifier(AccessibilityID.Sidebar.project(project.name))
                     }
                 }
             }
@@ -63,6 +67,19 @@ struct SidebarView: View {
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(!model.connection.isConnected)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingNewProject = true
+                } label: {
+                    Label("New Project", systemImage: "plus.rectangle.on.folder")
+                }
+                #if os(iOS)
+                // On macOS the File menu's New Project item has the shortcut.
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                #endif
+                .disabled(!model.connection.isConnected)
+                .accessibilityIdentifier(AccessibilityID.Sidebar.newProject)
             }
             #if os(iOS)
             ToolbarItem(placement: .topBarLeading) {

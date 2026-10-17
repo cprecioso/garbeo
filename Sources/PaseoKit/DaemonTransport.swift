@@ -114,6 +114,12 @@ extension DaemonEndpoint {
         return "\(relay.serverId) via \(relay.endpoint)"
     }
 
+    /// Whether the daemon runs on this machine: a direct connection to a loopback address.
+    public var isLoopback: Bool {
+        guard transportKind == .direct, let host = try? webSocketURL().host() else { return false }
+        return ["127.0.0.1", "localhost", "::1", "[::1]"].contains(host)
+    }
+
     public func relayConnection() throws -> RelayConnection? {
         transportKind == .relay ? try PairingLink.parse(url).connection : nil
     }
