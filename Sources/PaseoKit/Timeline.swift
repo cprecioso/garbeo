@@ -218,3 +218,56 @@ public struct AgentTimeline: Sendable {
         return TimelineRow(id: id, kind: kind, timestamp: timestamp)
     }
 }
+
+// MARK: - Sections
+
+extension TimelineRow {
+    /// Reasoning and tool calls: the agent's work towards its output rather than the output itself.
+    public var isActivity: Bool {
+        switch kind {
+        case .reasoning, .tool: true
+        default: false
+        }
+    }
+}
+
+/// What the timeline shows: a row, or a run of consecutive activity rows collapsed into one block.
+public enum TimelineSection: Identifiable, Hashable, Sendable {
+    case row(TimelineRow)
+    case activity(id: String, rows: [TimelineRow])
+
+    public var id: String {
+        switch self {
+        case .row(let row): row.id
+        case .activity(let id, _): id
+        }
+    }
+
+    /// Groups every run of two or more consecutive activity rows. A lone activity row stays a row.
+    public static func sections(of rows: [TimelineRow]) -> [TimelineSection] {
+        var sections: [TimelineSection] = []
+        var run: [TimelineRow] = []
+        func flush() {
+            if run.count > 1 {
+                sections.append(.activity(id: "activity-\(run[0].id)", rows: run))
+            } else if let row = run.first {
+                sections.append(.row(row))
+            }
+            run = []
+        }
+        for row in rows {
+            if row.isActivity {
+                run.append(row)
+            } else {
+                flush()
+                sections.append(.row(row))
+            }
+        }
+        flush()
+        return sections
+    }
+}
+
+extension AgentTimeline {
+    public var sections: [TimelineSection] { TimelineSection.sections(of: rows) }
+}

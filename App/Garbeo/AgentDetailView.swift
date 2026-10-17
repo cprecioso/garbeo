@@ -192,7 +192,7 @@ private struct AgentMoreMenu: View {
 private struct TimelineView: View {
     @Environment(AppModel.self) private var model
     let agent: Agent
-    /// Expanded reasoning and tool rows. Kept here rather than in the rows, since the lazy stack
+    /// Expanded reasoning and tool rows and activity groups. Kept here rather than in the rows, since the lazy stack
     /// may discard an off-screen row's state.
     @State private var expanded: Set<String> = []
 
@@ -225,8 +225,16 @@ private struct TimelineView: View {
                 } else if timeline.rows.isEmpty {
                     Text("No messages yet.").foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
                 }
-                ForEach(timeline.rows) { row in
-                    TimelineRowView(row: row, isExpanded: isExpanded(row.id))
+                let sections = timeline.sections
+                ForEach(sections) { section in
+                    switch section {
+                    case .row(let row):
+                        TimelineRowView(row: row, isExpanded: isExpanded(row.id))
+                    case .activity(let id, let rows):
+                        ActivityGroup(
+                            rows: rows, isLive: agent.status == .running && section.id == sections.last?.id,
+                            isExpanded: isExpanded(id), isRowExpanded: isExpanded)
+                    }
                 }
                 if agent.status == .running {
                     WorkingIndicator(since: agent.activeTurn?.startedAt)
@@ -322,6 +330,57 @@ struct TimelineRowView: View {
                 Text(status == "loading" ? "Compacting context…" : "Context compacted").font(.caption).foregroundStyle(.secondary)
                 VStack { Divider() }
             }
+        }
+    }
+}
+
+/// Consecutive reasoning and tool rows, collapsed into one row so the replies stand out.
+private struct ActivityGroup: View {
+    let rows: [TimelineRow]
+    /// The agent is still working on this group: its latest step stays visible while collapsed.
+    let isLive: Bool
+    @Binding var isExpanded: Bool
+    let isRowExpanded: (String) -> Binding<Bool>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CollapsibleRow(icon: "square.stack", title: title, subtitle: nil, tint: hasFailed ? .red : .secondary,
+                           trailing: statusView, isExpanded: $isExpanded)
+            {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(rows) { row in
+                        TimelineRowView(row: row, isExpanded: isRowExpanded(row.id))
+                    }
+                }
+            }
+            if isLive, !isExpanded, let latest = rows.last {
+                TimelineRowView(row: latest, isExpanded: isRowExpanded(latest.id)).padding(.leading, 22)
+            }
+        }
+    }
+
+    private var calls: [ToolCall] {
+        rows.compactMap { if case .tool(let call) = $0.kind { call } else { nil } }
+    }
+
+    private var hasFailed: Bool { calls.contains { $0.status == "failed" } }
+
+    private var title: String {
+        var parts: [String] = []
+        if rows.contains(where: { if case .reasoning = $0.kind { true } else { false } }) { parts.append("Thinking") }
+        switch calls.count {
+        case 0: break
+        case 1: parts.append("1 tool call")
+        case let count: parts.append("\(count) tool calls")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    @ViewBuilder private var statusView: some View {
+        if calls.contains(where: { $0.status == "running" }) {
+            ProgressView().controlSize(.mini)
+        } else if hasFailed {
+            Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
         }
     }
 }
