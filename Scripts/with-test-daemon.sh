@@ -40,8 +40,22 @@ if [ -z "${PASEO_LIVE_URL:-}" ]; then
   mkdir -p "$project"
   git -C "$project" init -q -b main
   git -C "$project" -c user.name=Garbeo -c user.email=garbeo@example.invalid commit -q --allow-empty -m init
-  workspace=$(paseo workspace create --host "$address" --isolation local --path "$project" --title "Test project" --json |
-    sed -n 's/.*"workspaceId": *"\([^"]*\)".*/\1/p')
+  # The health check can answer before the daemon accepts clients, so retry.
+  workspace=
+  tries=0
+  while [ -z "$workspace" ]; do
+    workspace=$(paseo workspace create --host "$address" --isolation local --path "$project" --title "Test project" --json 2>&1 |
+      sed -n 's/.*"workspaceId": *"\([^"]*\)".*/\1/p')
+    tries=$((tries + 1))
+    if [ -z "$workspace" ]; then
+      if [ $tries -ge 30 ]; then
+        echo "Couldn't create a workspace on the test daemon:" >&2
+        cat "$home/daemon.log" >&2
+        exit 1
+      fi
+      sleep 1
+    fi
+  done
 
   export PASEO_LIVE_URL=$address
   export PASEO_LIVE_WORKSPACE=$workspace
