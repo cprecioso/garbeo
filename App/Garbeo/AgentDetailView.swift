@@ -507,28 +507,9 @@ private struct ComposerView: View {
     @Environment(AppModel.self) private var model
     let agent: Agent
     @State private var text = ""
-    @FocusState private var isFocused: Bool
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField("Message the agent…", text: $text, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...10)
-                .focused($isFocused)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.separator))
-                .onSubmit(send)
-                #if os(macOS)
-                .onKeyPress(.return, phases: .down) { press in
-                    // Shift-Return inserts a newline; Return sends.
-                    if press.modifiers.contains(.shift) { return .ignored }
-                    send()
-                    return .handled
-                }
-                #endif
-
+        ComposerField(text: $text, canSend: canSend, focusOnAppear: Self.focusesOnAppear, send: send) {
             if agent.status == .running {
                 Button {
                     Task { await model.cancel(agent.id) }
@@ -540,17 +521,16 @@ private struct ComposerView: View {
                 .help("Stop the current turn")
                 .keyboardShortcut(".", modifiers: .command)
             }
-            Button(action: send) {
-                Image(systemName: "arrow.up.circle.fill").font(.title)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(canSend ? Color.accentColor : Color.secondary)
-            .disabled(!canSend)
-            .help("Send")
         }
         .padding()
+    }
+
+    /// iOS would bring up the keyboard over the timeline whenever an agent is opened.
+    private static var focusesOnAppear: Bool {
         #if os(macOS)
-        .onAppear { isFocused = true }
+        true
+        #else
+        false
         #endif
     }
 
@@ -563,5 +543,56 @@ private struct ComposerView: View {
         guard canSend else { return }
         text = ""
         Task { await model.send(message, to: agent.id) }
+    }
+}
+
+/// A chat's message field and send button, with `controls` (a stop button…) in between. Shared by
+/// agents and new agents.
+struct ComposerField<Controls: View>: View {
+    @Binding var text: String
+    var canSend: Bool
+    /// Takes keyboard focus when it appears.
+    var focusOnAppear: Bool
+    var send: () -> Void
+    @ViewBuilder var controls: Controls
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            TextField("Message the agent…", text: $text, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...10)
+                .focused($isFocused)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.separator))
+                .onSubmit(submit)
+                #if os(macOS)
+                .onKeyPress(.return, phases: .down) { press in
+                    // Shift-Return inserts a newline; Return sends.
+                    if press.modifiers.contains(.shift) { return .ignored }
+                    submit()
+                    return .handled
+                }
+                #endif
+                .accessibilityIdentifier(AccessibilityID.Composer.field)
+
+            controls
+            Button(action: submit) {
+                Image(systemName: "arrow.up.circle.fill").font(.title)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(canSend ? Color.accentColor : Color.secondary)
+            .disabled(!canSend)
+            .help("Send")
+            .accessibilityLabel("Send")
+            .accessibilityIdentifier(AccessibilityID.Composer.send)
+        }
+        .onAppear { if focusOnAppear { isFocused = true } }
+    }
+
+    private func submit() {
+        if canSend { send() }
     }
 }

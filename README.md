@@ -13,8 +13,8 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Syntax highlighting with [tree-sitter](https://tree-sitter.github.io) grammars, downloaded on first use, for markdown code blocks, read/written files, edit diffs (old and new sides parsed separately) and shell commands in permission requests (see [Syntax highlighting](#syntax-highlighting))
 - Send messages (optimistic, confirmed when the daemon echoes them), stop a running turn, change permission mode, archive
 - Answer permission requests inline (provider-supplied actions or Allow/Deny)
-- Create agents: workspace, provider, model, thinking level, mode, prompt
-- Create workspaces: a new worktree branching off a ref (default: the project's default branch), or checking out an existing branch or pull request, optionally named and with a first agent. Branch fields suggest the repository's branches. The New Agent sheet can also create its worktree
+- Create agents: New Agent opens a chat for the agent right away, with its workspace (or a new worktree), provider, model, thinking level and mode as menus above the focused composer. The agent is created on the daemon when its first message is sent
+- Create workspaces: a new worktree branching off a ref (default: the project's default branch), or checking out an existing branch or pull request, optionally named and with a first agent. Branch fields suggest the repository's branches. A new agent chat can also create its worktree
 - Workspace setup progress: live status of the project's setup scripts above the workspace's tabs (macOS) or in its sidebar section (iOS), with per-command output, and approval for setups blocked on a fork pull request's code
 - Workspace terminals: tabs of their workspace on macOS, listed per workspace in the sidebar on iOS (live via `terminals_changed`), opened in a real terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with keyboard input, screen restore on attach, resize, new and kill. On iOS, SwiftTerm's accessory bar provides esc, ctrl, tab, and arrow keys
 - Automatic reconnect with backoff; ping/pong liveness lease

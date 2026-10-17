@@ -3,7 +3,6 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
-    @Binding var showingNewAgent: Bool
     @Binding var showingNewWorkspace: Bool
     @State private var search = ""
     #if os(iOS)
@@ -48,10 +47,11 @@ struct SidebarView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showingNewAgent = true
+                    model.startNewAgent()
                 } label: {
                     Label("New Agent", systemImage: "square.and.pencil")
                 }
+                .accessibilityIdentifier(AccessibilityID.Sidebar.newAgent)
                 .keyboardShortcut("n")
                 .disabled(!model.connection.isConnected)
             }

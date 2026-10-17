@@ -97,7 +97,6 @@ struct RootView: View {
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
-    @State private var showingNewAgent = false
     @State private var showingNewWorkspace = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     #if os(macOS)
@@ -109,16 +108,17 @@ struct MainView: View {
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+            SidebarView(showingNewWorkspace: $showingNewWorkspace)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             #if os(macOS)
             if let pane = model.plugins.activePane {
                 PluginPaneDetail(target: pane)
+            } else if let chat = model.newAgent {
+                NewAgentChatView(chat: chat)
+                    .id(ObjectIdentifier(chat))
             } else if let workspace = model.selectedWorkspace {
-                WorkspaceView(
-                    workspace: workspace, tabs: workspaceTabs.tabs(for: workspace, model: model),
-                    showingNewAgent: $showingNewAgent)
+                WorkspaceView(workspace: workspace, tabs: workspaceTabs.tabs(for: workspace, model: model))
                     .id(workspace.id)
             } else if let terminal = model.terminals.selectedTerminal {
                 TerminalDetailView(terminal: terminal)
@@ -127,11 +127,14 @@ struct MainView: View {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
-                EmptyDetailView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+                EmptyDetailView(showingNewWorkspace: $showingNewWorkspace)
             }
             #else
             if let pane = model.plugins.activePane, sizeClass != .compact {
                 PluginPaneDetail(target: pane)
+            } else if let chat = model.newAgent {
+                NewAgentChatView(chat: chat)
+                    .id(ObjectIdentifier(chat))
             } else if let terminal = model.terminals.selectedTerminal {
                 TerminalDetailView(terminal: terminal)
                     .id(terminal.id)
@@ -139,12 +142,9 @@ struct MainView: View {
                 AgentDetailView(agent: agent)
                     .id(agent.id)
             } else {
-                EmptyDetailView(showingNewAgent: $showingNewAgent, showingNewWorkspace: $showingNewWorkspace)
+                EmptyDetailView(showingNewWorkspace: $showingNewWorkspace)
             }
             #endif
-        }
-        .sheet(isPresented: $showingNewAgent) {
-            NewAgentView()
         }
         .sheet(isPresented: $showingNewWorkspace) {
             NewWorkspaceView()
@@ -168,7 +168,6 @@ struct MainView: View {
 
 struct EmptyDetailView: View {
     @Environment(AppModel.self) private var model
-    @Binding var showingNewAgent: Bool
     @Binding var showingNewWorkspace: Bool
 
     var body: some View {
@@ -181,7 +180,7 @@ struct EmptyDetailView: View {
                 Text("Pick an agent from the sidebar.")
             }
         } actions: {
-            Button("New Agent") { showingNewAgent = true }
+            Button("New Agent") { model.startNewAgent() }
                 .buttonStyle(.borderedProminent)
             Button("New Workspace") { showingNewWorkspace = true }
         }

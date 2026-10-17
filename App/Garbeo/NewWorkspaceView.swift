@@ -76,7 +76,7 @@ struct NewWorkspaceView: View {
     }
 }
 
-/// Where a new worktree comes from, being filled in by the New Workspace and New Agent sheets.
+/// Where a new worktree comes from, being filled in by the New Workspace sheet or a new agent chat.
 @MainActor
 struct WorktreeDraft {
     enum Start: Hashable {

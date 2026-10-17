@@ -9,9 +9,26 @@ enum AccessibilityID {
 
     enum Sidebar {
         static let list = "sidebar.list"
+        static let newAgent = "sidebar.newAgent"
     }
 
     enum Detail {
         static let empty = "detail.empty"
+    }
+
+    enum NewAgent {
+        /// Shown until the first message is sent.
+        static let placeholder = "newAgent.placeholder"
+        static let workspace = "newAgent.workspace"
+        static let provider = "newAgent.provider"
+        static let model = "newAgent.model"
+        static let mode = "newAgent.mode"
+        static let error = "newAgent.error"
+    }
+
+    /// The message field of an agent or new agent chat.
+    enum Composer {
+        static let field = "composer.field"
+        static let send = "composer.send"
     }
 }

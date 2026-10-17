@@ -19,6 +19,8 @@ enum SidebarSelection: Hashable {
     case agent(String)
     case workspace(String)
     case terminal(String)
+    /// A new agent being written, see `AppModel.newAgent`.
+    case newAgent
 }
 
 struct ProjectGroup: Identifiable {
@@ -46,8 +48,13 @@ final class AppModel {
     /// `TerminalDirectory` (new terminal, terminal gone) goes through `terminals.selectedTerminalId`,
     /// which reads and writes this.
     var selection: SidebarSelection? {
-        didSet { if let workspace = selectedWorkspace { lastWorkspaceId = workspace.id } }
+        didSet {
+            if let workspace = selectedWorkspace { lastWorkspaceId = workspace.id }
+            if selection != .newAgent { newAgent = nil }
+        }
     }
+    /// The new agent shown while `selection` is `.newAgent`, see `startNewAgent(in:)`.
+    private(set) var newAgent: NewAgentChat?
     let terminals = TerminalDirectory()
     var lastError: String?
     let plugins = PluginStore()
@@ -55,6 +62,8 @@ final class AppModel {
     var endpoint: DaemonEndpoint? {
         didSet { Self.saveEndpoint(endpoint) }
     }
+    /// Overrides how the daemon is reached (unit tests).
+    @ObservationIgnored var transportFactory: (@Sendable () throws -> any DaemonTransport)?
 
     private(set) var client: DaemonClient?
     private var eventTask: Task<Void, Never>?
@@ -115,7 +124,7 @@ final class AppModel {
         case .workspace(let id): workspaces[id]
         case .agent(let id): agents[id].flatMap(workspace(for:))
         case .terminal: terminals.selectedTerminal.flatMap(terminals.workspaceId(of:)).flatMap { workspaces[$0] }
-        case nil: nil
+        case .newAgent, nil: nil
         }
     }
 
@@ -210,7 +219,7 @@ final class AppModel {
         if let old = client { await old.disconnect() }
 
         if !isReconnect { connection = .connecting }
-        let client = DaemonClient(endpoint: endpoint, clientId: clientId)
+        let client = DaemonClient(endpoint: endpoint, clientId: clientId, transportFactory: transportFactory)
         do {
             let info = try await client.connect()
             guard myGeneration == generation else { await client.disconnect(); return }
@@ -489,6 +498,17 @@ final class AppModel {
     func modes(provider: String, cwd: String?) async throws -> [AgentMode] {
         guard let client else { throw PaseoError.disconnected }
         return try await client.listModes(provider: provider, cwd: cwd)
+    }
+
+    /// Shows a new agent chat in `workspace` (default: the selected workspace, else the most recent
+    /// one). The agent is created when its first message is sent. Keeps the chat already shown when
+    /// no workspace is given.
+    func startNewAgent(in workspace: Workspace? = nil) {
+        guard workspace != nil || selection != .newAgent else { return }
+        let workspace = workspace ?? selectedWorkspace ?? projects.first?.workspaces.first
+        let chat = NewAgentChat(workspace: workspace, provider: selectedAgent?.provider)
+        selection = .newAgent
+        newAgent = chat
     }
 
     func createAgent(_ options: DaemonClient.CreateAgentOptions) async throws {
