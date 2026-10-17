@@ -37,6 +37,7 @@ Sources/PaseoKit/
   TerminalFrames.swift   terminal binary frame codec, snapshot → ANSI renderer
   Terminals.swift        terminal requests, slot-routed output streams
   Plugins.swift          plugin list/catalog/RPC requests and catalog-change events
+  PluginContributions.swift  contributions plugin hosts report, and which ones each workspace menu lists
   Worktrees.swift        worktree creation, setup progress, branch suggestions
 Sources/GarbeoTerminal/  GarbeoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
 Sources/GarbeoSyntax/
@@ -64,6 +65,7 @@ App/Shared/              AccessibilityID: identifiers shared by the app and its 
 App/GarbeoTests/         unit tests hosted in the app (@testable import Garbeo)
 App/GarbeoUITests/       XCUITests; Harness/ has launchForTesting, element(_:), clickOrTap, replaceText, LiveDaemon
 Scripts/with-test-daemon.sh  runs a command against a throwaway daemon (e2e and UI tests)
+Scripts/test-plugin/     the plugin that daemon installs, for tests of plugin UI
 PluginHost/              source of the JS host runtime (React, react-native-web, Paseo plugin SDK)
 ```
 
@@ -111,9 +113,9 @@ mise run //App:test:ui:mac      # XCUITests (App/GarbeoUITests) against a throwa
 mise run test                   # all of the above, macOS only
 ```
 
-`Scripts/with-test-daemon.sh` starts the throwaway daemon (needs `paseo` on the `PATH`) on `127.0.0.1:6871` (`PASEO_TEST_PORT`) with its own home and one workspace, sets `PASEO_LIVE_URL`, `PASEO_LIVE_WORKSPACE`, `PASEO_LIVE_THROWAWAY=1` and `PASEO_LIVE_TERMINALS=1`, and passes them on to XCUITests as `TEST_RUNNER_*`. With `PASEO_LIVE_URL` already set it uses that daemon instead and starts nothing. Tests that need a daemon skip without one. The iOS tasks run on `IOS_SIMULATOR` (default `iPhone 17`); results land in `App/build/results`. macOS XCUITests need Automation Mode, which asks for authentication the first time.
+`Scripts/with-test-daemon.sh` starts the throwaway daemon (needs `paseo` on the `PATH`) on `127.0.0.1:6871` (`PASEO_TEST_PORT`) with its own home, one workspace and one plugin (`Scripts/test-plugin`: a workspace panel and two workspace commands, shaped like paseo-gh-stack), sets `PASEO_LIVE_URL`, `PASEO_LIVE_WORKSPACE`, `PASEO_LIVE_THROWAWAY=1`, `PASEO_LIVE_TERMINALS=1` and `PASEO_LIVE_PLUGINS=1`, and passes them on to XCUITests as `TEST_RUNNER_*`. With `PASEO_LIVE_URL` already set it uses that daemon instead and starts nothing. Tests that need a daemon skip without one. The iOS tasks run on `IOS_SIMULATOR` (default `iPhone 17`); results land in `App/build/results`. macOS XCUITests need Automation Mode, which asks for authentication the first time.
 
-UI tests launch the app with `XCUIApplication.launchForTesting(daemon:arguments:)` (`App/GarbeoUITests/Harness`): `-GarbeoEphemeral YES` keeps settings in a throwaway domain and secrets in memory, so the app never sees or changes your saved hosts, and `-PaseoConnect <address>` connects on launch. Use `LiveDaemon.require()` for the daemon's address (skips without one) and `LiveDaemon.requireThrowaway()` before changing its state. Find elements by accessibility identifier: add a constant to `App/Shared/AccessibilityID.swift` (`<area>.<element>`, shared by the app and the UI tests), set it with `.accessibilityIdentifier(…)`, and look it up with `app.element(AccessibilityID.….…)`. Press buttons with `clickOrTap()` (`tap()` doesn't press SwiftUI buttons on macOS).
+UI tests launch the app with `XCUIApplication.launchForTesting(daemon:arguments:)` (`App/GarbeoUITests/Harness`): `-GarbeoEphemeral YES` keeps settings in a throwaway domain and secrets in memory, so the app never sees or changes your saved hosts, and `-PaseoConnect <address>` connects on launch. Use `LiveDaemon.require()` for the daemon's address (skips without one) and `LiveDaemon.requireThrowaway()` before changing its state; `LiveDaemon.requirePlugins()` skips unless the test plugin is installed. Find elements by accessibility identifier: add a constant to `App/Shared/AccessibilityID.swift` (`<area>.<element>`, shared by the app and the UI tests), set it with `.accessibilityIdentifier(…)`, and look it up with `app.element(AccessibilityID.….…)`. Press buttons with `clickOrTap()` (`tap()` doesn't press SwiftUI buttons on macOS).
 
 The live SwiftPM tests can also target a daemon of your own:
 

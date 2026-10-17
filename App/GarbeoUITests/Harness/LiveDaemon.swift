@@ -25,6 +25,15 @@ enum LiveDaemon {
         return url
     }
 
+    /// Skips unless the daemon has Scripts/test-plugin installed (`PASEO_LIVE_PLUGINS=1`, set by
+    /// `with-test-daemon.sh`): a workspace panel "Fixture Panel", a command "Open Fixture Panel" that only
+    /// opens it, and a command "Fixture: run action".
+    static func requirePlugins() throws {
+        guard ProcessInfo.processInfo.environment["PASEO_LIVE_PLUGINS"] == "1" else {
+            throw XCTSkip("Needs Scripts/test-plugin installed; set PASEO_LIVE_PLUGINS=1 if it is")
+        }
+    }
+
     /// The workspace `with-test-daemon.sh` created (`PASEO_LIVE_WORKSPACE`), or skips the test.
     static func requireWorkspace() throws -> String {
         guard let id = ProcessInfo.processInfo.environment["PASEO_LIVE_WORKSPACE"], !id.isEmpty else {

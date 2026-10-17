@@ -1,0 +1,7 @@
+{
+  "id": "garbeo-test-plugin",
+  "name": "Garbeo test plugin",
+  "requirements": {
+    "paseo": ">=0.11.4"
+  }
+}

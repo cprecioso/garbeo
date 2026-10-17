@@ -9,9 +9,14 @@ enum AccessibilityID {
 
     enum Sidebar {
         static let list = "sidebar.list"
+        static let workspaceRow = "sidebar.workspaceRow"
     }
 
     enum Detail {
         static let empty = "detail.empty"
+    }
+
+    enum Workspace {
+        static let openTabMenu = "workspace.openTabMenu"
     }
 }
