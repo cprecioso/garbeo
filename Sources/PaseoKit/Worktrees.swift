@@ -1,7 +1,7 @@
 import Foundation
 
-// Paseo worktree creation, its setup scripts, and branch suggestions for picking refs
-// (packages/protocol/src/messages.ts).
+// Paseo worktree creation, its setup scripts, archiving workspaces, and branch suggestions for
+// picking refs (packages/protocol/src/messages.ts).
 
 public struct CreateWorktreeOptions: Sendable, Hashable {
     public enum Source: Sendable, Hashable {
@@ -163,6 +163,12 @@ public struct BranchSuggestion: Decodable, Sendable, Hashable, Identifiable {
     public var id: String { name }
 }
 
+struct ArchiveWorkspaceResponse: Decodable {
+    var workspaceId: String
+    var archivedAt: String?
+    var error: String?
+}
+
 struct BranchSuggestionsResponse: Decodable {
     var branches: [String]
     var branchDetails: [BranchSuggestion]?
@@ -198,6 +204,20 @@ extension DaemonClient {
         ], as: WorkspaceSetupRunResponse.self)
         if let error = response.error { throw PaseoError.rpc(error) }
         return response.started
+    }
+
+    /// Archives a workspace: the daemon archives its agents, kills its terminals and, for a Paseo
+    /// worktree, removes its directory. Other workspaces' files stay as they are.
+    public func archiveWorkspace(workspaceId: String) async throws {
+        // Removing a worktree's directory can take a while.
+        let response = try await request(
+            Self.archiveWorkspaceMessage(workspaceId: workspaceId), as: ArchiveWorkspaceResponse.self,
+            timeout: .seconds(120))
+        if let error = response.error { throw PaseoError.rpc(error) }
+    }
+
+    static func archiveWorkspaceMessage(workspaceId: String) -> [String: JSONValue] {
+        ["type": "archive_workspace_request", "workspaceId": .string(workspaceId)]
     }
 
     /// Branches of the repository at `cwd` matching `query`.

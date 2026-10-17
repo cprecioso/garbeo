@@ -16,6 +16,7 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Create agents: New Agent opens a chat for the agent right away, with its workspace (or a new worktree), provider, model, thinking level and mode as menus above the focused composer. The agent is created on the daemon when its first message is sent
 - Create projects from a directory on the daemon's machine (sidebar toolbar, File ▸ New Project…, ⌥⌘N), with an optional name. The path field suggests the daemon's directories; a daemon on this Mac also offers a folder picker
 - Create workspaces: a new worktree branching off a ref (default: the project's default branch), or checking out an existing branch or pull request, optionally named and with a first agent. Branch fields suggest the repository's branches. A new agent chat can also create its worktree
+- Archive workspaces (sidebar context menu, File ▸ Archive Workspace, ⇧⌘⌫): a Paseo worktree is archived along with its agents and terminals, and its directory removed, asking first when it has uncommitted changes or unpushed commits. Other workspaces are hidden from the sidebar instead, leaving their files alone
 - Workspace setup progress: live status of the project's setup scripts above the workspace's tabs (macOS) or in its sidebar section (iOS), with per-command output, and approval for setups blocked on a fork pull request's code
 - Workspace terminals: tabs of their workspace on macOS, listed per workspace in the sidebar on iOS (live via `terminals_changed`), opened in a real terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with keyboard input, screen restore on attach, resize, new and kill. ⌘T opens a new terminal in the focused workspace (File > New Terminal Tab on macOS; on iPad with a hardware keyboard, once one of its agents or terminals is selected). On iOS, SwiftTerm's accessory bar provides esc, ctrl, tab, and arrow keys
 - Automatic reconnect with backoff; ping/pong liveness lease
@@ -40,7 +41,7 @@ Sources/PaseoKit/
   Terminals.swift        terminal requests, slot-routed output streams
   Plugins.swift          plugin list/catalog/RPC requests and catalog-change events
   PluginContributions.swift  contributions plugin hosts report, and which ones each workspace menu lists
-  Worktrees.swift        worktree creation, setup progress, branch suggestions
+  Worktrees.swift        worktree creation, setup progress, workspace archiving, branch suggestions
   Projects.swift         adding and renaming projects, directory suggestions
 Sources/GarbeoTerminal/  GarbeoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
 Sources/GarbeoSyntax/

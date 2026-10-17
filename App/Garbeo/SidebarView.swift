@@ -189,7 +189,7 @@ private struct WorkspaceLabel: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: workspace.workspaceKind == "worktree" ? "arrow.triangle.branch" : "folder")
+            Image(systemName: workspace.isWorktree ? "arrow.triangle.branch" : "folder")
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
             Text(workspace.displayName).lineLimit(1)
@@ -205,6 +205,10 @@ private struct WorkspaceLabel: View {
                 Task { await model.terminals.create(in: workspace) }
             }
             PluginWorkspaceMenuItems(workspaceId: workspace.id)
+            Divider()
+            Button(workspace.archiveTitle, systemImage: workspace.archiveSystemImage) {
+                model.requestArchive(workspace)
+            }
         }
     }
 }

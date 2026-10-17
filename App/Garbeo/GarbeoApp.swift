@@ -145,6 +145,7 @@ struct MainView: View {
             if selection != nil { model.plugins.activePane = nil }
         }
         .commandCenter()
+        .workspaceArchiveConfirmation()
         .background(PluginRegistryHost())
     }
 }
