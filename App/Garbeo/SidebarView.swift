@@ -19,7 +19,7 @@ struct SidebarView: View {
             ForEach(model.projects) { project in
                 let workspaces = project.workspaces.filter { matches($0) }
                 if !workspaces.isEmpty {
-                    Section(project.name) {
+                    Section {
                         ForEach(workspaces) { workspace in
                             #if os(macOS)
                             // A workspace's agents and terminals are its tabs, not sidebar rows.
@@ -31,6 +31,9 @@ struct SidebarView: View {
                                 terminals: model.terminals.terminals(in: workspace).filter(matches))
                             #endif
                         }
+                    } header: {
+                        Text(project.name)
+                            .accessibilityIdentifier(AccessibilityID.Sidebar.project(project.name))
                     }
                 }
             }

@@ -10,6 +10,9 @@ enum AccessibilityID {
     enum Sidebar {
         static let list = "sidebar.list"
         static let newProject = "sidebar.newProject"
+
+        /// A project's section header, by the project's name.
+        static func project(_ name: String) -> String { "sidebar.project.\(name)" }
     }
 
     enum NewProject {

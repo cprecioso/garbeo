@@ -70,10 +70,22 @@ final class NewProjectUITests: XCTestCase {
             app.navigationBars.buttons.element(boundBy: 0).clickOrTap()
         }
         #endif
-        // The project's sidebar section header carries its name as the label. (Matching on `value` too
-        // would fail the whole query once a text with a non-string value is on screen.)
-        let header = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", projectName)).firstMatch
-        XCTAssertTrue(header.waitForExistence(timeout: 15), "the project isn't in the sidebar")
+        let header = app.element(AccessibilityID.Sidebar.project(projectName))
+        if !header.waitForExistence(timeout: 15) {
+            // TEMPORARY diagnostics: what queries resolve in the sidebar, as opposed to the failure snapshot.
+            let sidebar = app.element(AccessibilityID.Sidebar.list)
+            let resolved = sidebar.descendants(matching: .any).allElementsBoundByIndex.map {
+                "type=\($0.elementType.rawValue) id='\($0.identifier)' label='\($0.label)' value='\($0.value ?? "nil")'"
+            }
+            let report = "Resolved in sidebar:\n\(resolved.joined(separator: "\n"))\n\nSidebar:\n\(sidebar.debugDescription)"
+            print(report)
+            let attachment = XCTAttachment(string: report)
+            attachment.name = "sidebar-query-diagnostics"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            XCTFail("the project isn't in the sidebar")
+            return
+        }
         #if os(macOS)
         // Selecting its workspace opens it in place of the empty detail.
         XCTAssertTrue(app.element(AccessibilityID.Detail.empty).waitForNonExistence(timeout: 10), "its workspace isn't selected")
