@@ -41,6 +41,7 @@ struct SidebarView: View {
                 }
             }
         }
+        .accessibilityIdentifier(AccessibilityID.Sidebar.list)
         .searchable(text: $search, placement: .sidebar, prompt: searchPrompt)
         .safeAreaInset(edge: .bottom, spacing: 0) { ConnectionFooter() }
         .navigationTitle(model.serverInfo?.hostname ?? "Garbeo")

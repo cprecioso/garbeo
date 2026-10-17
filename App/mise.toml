@@ -35,3 +35,24 @@ vars = { lane = "ios build"}
 [tasks."beta:ios"]
 extends = "fastlane"
 vars = { lane = "ios beta"}
+
+[tasks."test:unit:mac"]
+description = "App unit tests (GarbeoTests), hosted in the macOS app"
+extends = "xcodebuild-test"
+vars = { target = "GarbeoTests", platform = "mac", destination = "platform=macOS" }
+
+[tasks."test:unit:ios"]
+description = "App unit tests (GarbeoTests), hosted in the iOS app (IOS_SIMULATOR, default iPhone 17)"
+extends = "xcodebuild-test"
+vars = { target = "GarbeoTests", platform = "ios", destination = "platform=iOS Simulator,name=${IOS_SIMULATOR:-iPhone 17}" }
+
+[tasks."test:ui:mac"]
+description = "macOS UI tests (GarbeoUITests) against a throwaway daemon (or PASEO_LIVE_URL)"
+extends = "xcodebuild-test"
+vars = { target = "GarbeoUITests", platform = "mac", destination = "platform=macOS", wrapper = "../Scripts/with-test-daemon.sh" }
+
+[tasks."test:ui:ios"]
+description = "iOS UI tests (GarbeoUITests) against a throwaway daemon (or PASEO_LIVE_URL), on IOS_SIMULATOR (default iPhone 17)"
+extends = "xcodebuild-test"
+vars = { target = "GarbeoUITests", platform = "ios", destination = "platform=iOS Simulator,name=${IOS_SIMULATOR:-iPhone 17}", wrapper = "../Scripts/with-test-daemon.sh" }
+

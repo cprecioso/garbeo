@@ -1,9 +1,12 @@
 import Foundation
 import Security
+import Synchronization
 
 /// Minimal generic-password storage for daemon passwords and relay pairing keys.
+/// With `LaunchOptions.isEphemeral`, secrets stay in memory instead.
 enum Keychain {
     private static let service = "Garbeo.daemon-password"
+    private static let ephemeral = Mutex<[String: String]>([:])
 
     static func password(for account: String) -> String? {
         secret(service: service, account: account)
@@ -14,6 +17,7 @@ enum Keychain {
     }
 
     static func secret(service: String, account: String) -> String? {
+        if LaunchOptions.isEphemeral { return ephemeral.withLock { $0["\(service)/\(account)"] } }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -29,6 +33,10 @@ enum Keychain {
     }
 
     static func setSecret(_ value: String?, service: String, account: String) {
+        if LaunchOptions.isEphemeral {
+            ephemeral.withLock { $0["\(service)/\(account)"] = value?.isEmpty == false ? value : nil }
+            return
+        }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

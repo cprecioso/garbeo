@@ -80,15 +80,15 @@ private struct Lossy<Value: Decodable>: Decodable {
 /// Saves layouts in UserDefaults, one key per daemon and workspace.
 enum WorkspaceLayoutStore {
     static func load(server: String, workspace: String) -> WorkspaceLayout? {
-        guard let data = UserDefaults.standard.data(forKey: key(server, workspace)) else { return nil }
+        guard let data = UserDefaults.app.data(forKey: key(server, workspace)) else { return nil }
         return try? JSONDecoder().decode(WorkspaceLayout.self, from: data)
     }
 
     static func save(_ layout: WorkspaceLayout?, server: String, workspace: String) {
         if let layout, let data = try? JSONEncoder().encode(layout) {
-            UserDefaults.standard.set(data, forKey: key(server, workspace))
+            UserDefaults.app.set(data, forKey: key(server, workspace))
         } else {
-            UserDefaults.standard.removeObject(forKey: key(server, workspace))
+            UserDefaults.app.removeObject(forKey: key(server, workspace))
         }
     }
 

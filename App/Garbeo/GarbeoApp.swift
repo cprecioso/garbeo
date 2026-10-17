@@ -12,6 +12,12 @@ struct GarbeoApp: App {
                 .task {
                     #if DEBUG
                     DebugSnapshot.scheduleIfRequested(model: model)
+                    // Unit tests run inside the app; keep it off the network meanwhile.
+                    if LaunchOptions.isHostingUnitTests { return }
+                    if let address = LaunchOptions.connectAddress {
+                        await model.connect(to: DaemonEndpoint(url: address))
+                        return
+                    }
                     // Development aid: `-PaseoPairingLink <url>` pairs and connects on launch.
                     if let link = UserDefaults.standard.string(forKey: "PaseoPairingLink"),
                        let endpoint = try? DaemonEndpoint.fromPairingLink(link)
@@ -179,5 +185,6 @@ struct EmptyDetailView: View {
                 .buttonStyle(.borderedProminent)
             Button("New Workspace") { showingNewWorkspace = true }
         }
+        .accessibilityIdentifier(AccessibilityID.Detail.empty)
     }
 }
