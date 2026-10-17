@@ -28,6 +28,8 @@ final class CommandCenter {
     var isPresented = false
     var showingNewWorkspace = false
     var showingNewProject = false
+    /// The workspace whose archive confirmation is shown, see `AppModel.requestArchive(_:)`.
+    var workspaceToArchive: Workspace?
     /// Recently activated palette rows, newest first; they lead the list before anything is typed.
     private(set) var recentIds: [String] = UserDefaults.app.stringArray(forKey: "commandCenterRecents") ?? []
 
@@ -67,6 +69,16 @@ extension AppModel {
             ) {
                 guard let workspace else { return }
                 Task { await self.openNewTab(in: workspace) }
+            },
+            AppCommand(
+                id: "archive-workspace", title: workspace?.archiveTitle ?? "Archive Workspace",
+                systemImage: workspace?.archiveSystemImage ?? "archivebox", menu: .file,
+                shortcut: KeyboardShortcut(.delete, modifiers: [.command, .shift]),
+                keywords: ["archive", "hide", "remove", "worktree", "close"],
+                isEnabled: connected && workspace != nil
+            ) {
+                guard let workspace else { return }
+                self.requestArchive(workspace)
             },
             AppCommand(
                 id: "stop-agent", title: "Stop Agent", systemImage: "stop.circle", menu: .agent,
@@ -154,6 +166,10 @@ extension KeyboardShortcut {
         if modifiers.contains(.option) { label += "⌥" }
         if modifiers.contains(.shift) { label += "⇧" }
         if modifiers.contains(.command) { label += "⌘" }
-        return label + String(key.character).uppercased()
+        let key = switch key {
+        case .delete: "⌫"
+        default: String(key.character).uppercased()
+        }
+        return label + key
     }
 }

@@ -160,10 +160,14 @@ public struct Workspace: Decodable, Sendable, Identifiable, Hashable {
     public var activityAt: String?
     public var statusEnteredAt: String?
     public var pinnedAt: String?
+    /// Set while the daemon archives the workspace.
+    public var archivingAt: String?
     public var diffStat: DiffStat?
     public var gitRuntime: GitRuntime?
 
     public var projectName: String { projectCustomName ?? projectDisplayName ?? projectId }
+    /// A Paseo-owned worktree, whose directory archiving removes.
+    public var isWorktree: Bool { workspaceKind == "worktree" }
     public var displayName: String {
         if let title, !title.isEmpty { return title }
         return name

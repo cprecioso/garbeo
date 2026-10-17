@@ -55,6 +55,35 @@ import Testing
         #expect(failed.error == "Branch not found")
     }
 
+    @Test func archivesWorkspace() throws {
+        #expect(DaemonClient.archiveWorkspaceMessage(workspaceId: "w1") == [
+            "type": "archive_workspace_request", "workspaceId": "w1",
+        ])
+
+        let archived = try JSONDecoder().decode(SessionFrame<ArchiveWorkspaceResponse>.self, from: Data("""
+        {"type":"session","message":{"type":"archive_workspace_response","payload":{"requestId":"r",
+          "workspaceId":"w1","archivedAt":"2026-10-17T10:00:00.000Z","error":null}}}
+        """.utf8)).message.payload
+        #expect(archived.archivedAt == "2026-10-17T10:00:00.000Z")
+        #expect(archived.error == nil)
+
+        let failed = try JSONDecoder().decode(SessionFrame<ArchiveWorkspaceResponse>.self, from: Data("""
+        {"type":"session","message":{"type":"archive_workspace_response","payload":{"requestId":"r",
+          "workspaceId":"w1","archivedAt":null,"error":"Workspace not found: w1"}}}
+        """.utf8)).message.payload
+        #expect(failed.error == "Workspace not found: w1")
+    }
+
+    @Test func decodesArchivingWorkspace() throws {
+        let workspace = try JSONDecoder().decode(Workspace.self, from: Data("""
+        {"id":"w1","projectId":"p1","projectDisplayName":"repo","projectRootPath":"/repo",
+          "workspaceDirectory":"/wt/x","projectKind":"git","workspaceKind":"worktree","name":"x",
+          "status":"done","statusEnteredAt":null,"archivingAt":"2026-10-17T10:00:00.000Z"}
+        """.utf8))
+        #expect(workspace.isWorktree)
+        #expect(workspace.archivingAt == "2026-10-17T10:00:00.000Z")
+    }
+
     @Test func decodesSetupProgress() throws {
         let progress = try JSONDecoder().decode(SessionFrame<WorkspaceSetupProgress>.self, from: Data("""
         {"type":"session","message":{"type":"workspace_setup_progress","payload":{"workspaceId":"w1","status":"running",
