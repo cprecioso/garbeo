@@ -35,6 +35,13 @@ private func isOpen(_ chat: NewAgentChat, in model: AppModel) -> Bool {
     #endif
 }
 
+/// Waits for `condition`, which the app model meets once a daemon message is handled.
+@MainActor
+private func eventually(_ condition: () -> Bool) async throws {
+    for _ in 0..<200 where !condition() { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(condition())
+}
+
 @MainActor @Suite struct NewAgentChatTests {
     @Test func opensChatInSelectedWorkspaceWithoutCreatingAgent() async throws {
         let (model, daemon) = try await connectedModel()
@@ -224,5 +231,74 @@ private func isOpen(_ chat: NewAgentChat, in model: AppModel) -> Bool {
         #expect(agents.first?["config"]?["cwd"] == "/tmp/garbeo-fake/worktrees/login-fix")
         #expect(model.selection == .agent("agent_1"))
         #expect(!isOpen(chat, in: model))
+    }
+
+    @Test func loadsAgentProfilesAndFollowsChanges() async throws {
+        let (model, daemon) = try await connectedModel()
+        try await eventually { !model.agentProfiles.isEmpty }
+        #expect(model.agentProfiles.map(\.id) == ["profile_deep", "profile_fast"])
+
+        await daemon.setAgentProfiles([["id": "profile_new", "name": "New", "provider": "claude"]])
+
+        try await eventually { model.agentProfiles.map(\.id) == ["profile_new"] }
+    }
+
+    @Test func profileSetsAgentSettings() async throws {
+        let (model, daemon) = try await connectedModel()
+        try await eventually { !model.agentProfiles.isEmpty }
+        model.startNewAgent()
+        let chat = try openedChat(model)
+        await chat.agent.loadProviders(from: model)
+        let deep = try #require(model.agentProfiles.first)
+
+        chat.agent.apply(deep)
+        await chat.agent.loadDetails(from: model, cwd: chat.cwd(in: model))
+        chat.agent.dropUnavailableThinking()
+        #expect(chat.agent.profile == deep)
+        #expect(chat.agent.modelId == "opus-fake")
+        #expect(chat.agent.thinkingId == "high")
+        #expect(chat.agent.modeId == "plan")
+
+        chat.agent.prompt = "Fix the login bug"
+        await chat.send(in: model)
+
+        #expect(await daemon.createdAgents.first?["config"] == [
+            "provider": "claude", "cwd": .string(FakeDaemon.projectRoot), "model": "opus-fake",
+            "thinkingOptionId": "high", "modeId": "plan",
+        ])
+    }
+
+    @Test func changingASettingLeavesTheProfile() async throws {
+        let (model, _) = try await connectedModel()
+        try await eventually { !model.agentProfiles.isEmpty }
+        let draft = AgentDraft()
+        draft.apply(model.agentProfiles[0])
+        await draft.loadDetails(from: model, cwd: FakeDaemon.projectRoot)
+
+        draft.modeId = "default"
+
+        #expect(draft.profile == nil)
+        #expect(draft.modelId == "opus-fake")
+    }
+
+    @Test func profileFeaturesGoWithItsProvider() async throws {
+        let (model, daemon) = try await connectedModel()
+        try await eventually { !model.agentProfiles.isEmpty }
+        model.startNewAgent()
+        let chat = try openedChat(model)
+        let fast = try #require(model.agentProfiles.last)
+
+        chat.agent.apply(fast)
+        await chat.agent.loadDetails(from: model, cwd: chat.cwd(in: model))
+        #expect(chat.agent.profile == fast)
+        #expect(chat.agent.modelId == "gpt-fake")
+        chat.agent.prompt = "Quick fix"
+        await chat.send(in: model)
+        #expect(await daemon.createdAgents.last?["config"]?["featureValues"] == ["fast_mode": true])
+
+        chat.agent.provider = "claude"
+        chat.agent.prompt = "Another"
+        await chat.send(in: model)
+        #expect(await daemon.createdAgents.last?["config"]?["featureValues"] == nil)
     }
 }

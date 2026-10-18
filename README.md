@@ -13,7 +13,7 @@ A native SwiftUI client (macOS + iOS) for [Paseo](https://paseo.sh), the agentic
 - Syntax highlighting with [tree-sitter](https://tree-sitter.github.io) grammars, downloaded on first use, for markdown code blocks, read/written files, edit diffs (old and new sides parsed separately) and shell commands in permission requests (see [Syntax highlighting](#syntax-highlighting))
 - Send messages (optimistic, confirmed when the daemon echoes them), stop a running turn, change permission mode, archive
 - Answer permission requests inline (provider-supplied actions or Allow/Deny)
-- Create agents: New Agent opens a chat for the agent right away, with its workspace (or a new worktree), provider, model, thinking level and mode as menus above the focused composer. The agent is created on the daemon when its first message is sent
+- Create agents: New Agent opens a chat for the agent right away, with its workspace (or a new worktree), provider, model, thinking level and mode as menus above the focused composer. The agent is created on the daemon when its first message is sent. The daemon's agent profiles (Paseo ▸ Settings ▸ Agent profiles) fill a Profile menu there and in New Workspace: picking one sets provider, model, mode, thinking level and features at once. The menu follows profile edits made in other clients
 - Create projects from a directory on the daemon's machine (sidebar toolbar, File ▸ New Project…, ⌥⌘N), with an optional name. The path field suggests the daemon's directories; a daemon on this Mac also offers a folder picker
 - Create workspaces: a new worktree branching off a ref (default: the project's default branch), or checking out an existing branch or pull request, optionally named and with a first agent. Branch fields suggest the repository's branches. A new agent chat can also create its worktree
 - Archive workspaces (sidebar context menu, File ▸ Archive Workspace, ⇧⌘⌫): a Paseo worktree is archived along with its agents and terminals, and its directory removed, asking first when it has uncommitted changes or unpushed commits. Other workspaces are hidden from the sidebar instead, leaving their files alone
@@ -43,6 +43,7 @@ Sources/PaseoKit/
   PluginContributions.swift  contributions plugin hosts report, and which ones each workspace menu lists
   Worktrees.swift        worktree creation, setup progress, workspace archiving, branch suggestions
   Projects.swift         adding and renaming projects, directory suggestions
+  AgentProfiles.swift    agent profiles from the daemon's config, and its change events
 Sources/GarbeoTerminal/  GarbeoTerminalView: self-contained SwiftUI terminal (SwiftTerm), hostable in any container
 Sources/GarbeoSyntax/
   SyntaxLanguage.swift   languages; detection from file paths and markdown fence names

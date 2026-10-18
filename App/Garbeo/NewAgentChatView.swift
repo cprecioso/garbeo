@@ -14,7 +14,7 @@ final class NewAgentChat {
     let id = UUID()
     var destination: Destination?
     var worktree = WorktreeDraft()
-    /// Provider, model, thinking and mode; its prompt is the composer's text.
+    /// Profile, provider, model, thinking and mode; its prompt is the composer's text.
     let agent = AgentDraft()
     private(set) var isCreating = false
     /// The first message, shown while the agent is being created.
@@ -180,7 +180,7 @@ struct NewAgentChatView: View {
 }
 
 /// The new agent's settings as compact menus above the composer: workspace (or a new worktree),
-/// provider, model, thinking level and mode.
+/// profile, provider, model, thinking level and mode.
 private struct NewAgentOptions: View {
     @Environment(AppModel.self) private var model
     @Bindable var chat: NewAgentChat
@@ -220,6 +220,9 @@ private struct NewAgentOptions: View {
                             .environment(model)
                     }
                 }
+                if !model.agentProfiles.isEmpty {
+                    AgentProfilePicker(draft: agent, profiles: model.agentProfiles, noneLabel: "No profile")
+                }
                 Picker("Provider", selection: $agent.provider) {
                     ForEach(agent.providers.filter(\.available)) { Text($0.provider.capitalized).tag($0.provider) }
                 }
@@ -255,7 +258,7 @@ private struct NewAgentOptions: View {
         .scrollIndicators(.hidden)
         .task { await agent.loadProviders(from: model) }
         .task(id: [agent.provider, cwd]) { await agent.loadDetails(from: model, cwd: cwd) }
-        .onChange(of: agent.modelId) { agent.thinkingId = "" }
+        .onChange(of: agent.modelId) { agent.dropUnavailableThinking() }
     }
 
     private var worktreeSummary: String {
