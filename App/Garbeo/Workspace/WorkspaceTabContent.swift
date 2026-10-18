@@ -15,12 +15,14 @@ enum WorkspaceTabContent: Hashable, Codable, Sendable {
     case agent(AgentTab)
     case terminal(TerminalTab)
     case plugin(PluginTab)
+    case newAgent(NewAgentTab)
 
     var kind: any WorkspaceTabKind {
         switch self {
         case .agent(let tab): tab
         case .terminal(let tab): tab
         case .plugin(let tab): tab
+        case .newAgent(let tab): tab
         }
     }
 
@@ -29,7 +31,7 @@ enum WorkspaceTabContent: Hashable, Codable, Sendable {
         switch self {
         case .agent(let tab): .agent(tab.agentId)
         case .terminal(let tab): .terminal(tab.terminalId)
-        case .plugin: nil
+        case .plugin, .newAgent: nil
         }
     }
 }
@@ -125,6 +127,40 @@ struct AgentTab: WorkspaceTabKind {
         } catch {
             model.lastError = error.localizedDescription
         }
+    }
+}
+
+// MARK: - New agent
+
+/// A new agent being written, see `NewAgentChat`. Chats live in the model for the session only, so
+/// a restored layout drops these tabs.
+struct NewAgentTab: WorkspaceTabKind {
+    var chatId: UUID
+    /// The workspace it opens in; the chat may still start its agent elsewhere.
+    var workspaceId: String
+
+    func label(in model: AppModel) -> WorkspaceTabLabel? {
+        guard model.newAgentTabs[chatId] != nil else { return nil }
+        return WorkspaceTabLabel(title: "New Agent", icon: "square.and.pencil")
+    }
+
+    func makeContent(in model: AppModel) -> some View {
+        if let chat = model.newAgentTabs[chatId] {
+            NewAgentChatView(chat: chat, chrome: .pane)
+        }
+    }
+
+    func closeConfirmation(in model: AppModel) -> WorkspaceTabCloseConfirmation? {
+        guard let chat = model.newAgentTabs[chatId], !chat.agent.trimmedPrompt.isEmpty else { return nil }
+        return WorkspaceTabCloseConfirmation(
+            title: "Discard new agent?",
+            message: "The message you were writing will be lost.",
+            action: "Discard")
+    }
+
+    func close(in model: AppModel, closeTab: () -> Void) async {
+        closeTab()
+        model.closeNewAgentTab(chatId)
     }
 }
 

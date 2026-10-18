@@ -55,6 +55,10 @@ final class AppModel {
     }
     /// The new agent shown while `selection` is `.newAgent`, see `startNewAgent(in:)`.
     private(set) var newAgent: NewAgentChat?
+    /// New agents written in workspace tabs (macOS), by `NewAgentChat.id`, see `NewAgentTab`.
+    private(set) var newAgentTabs: [UUID: NewAgentChat] = [:]
+    /// A new agent tab for its workspace's `WorkspaceView` to open, see `startNewAgent(in:)`.
+    var newAgentTabRequest: NewAgentTab?
     let terminals = TerminalDirectory()
     var lastError: String?
     let plugins = PluginStore()
@@ -530,14 +534,30 @@ final class AppModel {
     }
 
     /// Shows a new agent chat in `workspace` (default: the selected workspace, else the most recent
-    /// one). The agent is created when its first message is sent. Keeps the chat already shown when
-    /// no workspace is given.
+    /// one). The agent is created when its first message is sent. On macOS the chat opens as a new
+    /// tab of that workspace. Elsewhere, or with no workspace at all, it fills the detail, and the
+    /// chat already shown there is kept when no workspace is given.
     func startNewAgent(in workspace: Workspace? = nil) {
+        #if os(macOS)
+        if let workspace = workspace ?? selectedWorkspace ?? projects.first?.workspaces.first {
+            let chat = NewAgentChat(workspace: workspace, provider: selectedAgent?.provider)
+            newAgentTabs[chat.id] = chat
+            newAgentTabRequest = NewAgentTab(chatId: chat.id, workspaceId: workspace.id)
+            plugins.activePane = nil
+            if selectedWorkspace?.id != workspace.id { selection = .workspace(workspace.id) }
+            return
+        }
+        #endif
         guard workspace != nil || selection != .newAgent else { return }
         let workspace = workspace ?? selectedWorkspace ?? projects.first?.workspaces.first
         let chat = NewAgentChat(workspace: workspace, provider: selectedAgent?.provider)
         selection = .newAgent
         newAgent = chat
+    }
+
+    /// Drops a new agent tab's chat, which closes its tab.
+    func closeNewAgentTab(_ chatId: UUID) {
+        newAgentTabs[chatId] = nil
     }
 
     func createAgent(_ options: DaemonClient.CreateAgentOptions) async throws {
