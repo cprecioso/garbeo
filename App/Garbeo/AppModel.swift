@@ -42,6 +42,8 @@ final class AppModel {
     private(set) var permissions: [String: [PermissionRequest]] = [:]
     /// Setup script progress by workspace ID, see `loadSetupStatus(for:)`.
     private(set) var setups: [String: WorkspaceSetupSnapshot] = [:]
+    /// The daemon's agent profiles, in their configured order. Empty on daemons without them.
+    private(set) var agentProfiles: [AgentProfile] = []
     /// Live timelines of the agents currently shown, see `showTimeline(_:viewer:)`.
     private(set) var timelines = TimelineRegistry()
     /// The single selection driving the detail column. Terminal selection made by
@@ -201,6 +203,7 @@ final class AppModel {
         agents = [:]
         permissions = [:]
         setups = [:]
+        agentProfiles = []
         timelines = TimelineRegistry()
         subscriptionSync.desired = []
         subscriptionSync.reset()
@@ -260,11 +263,26 @@ final class AppModel {
         permissions = Dictionary(agentList.compactMap { agent in
             agent.pendingPermissions.flatMap { $0.isEmpty ? nil : (agent.id, $0) }
         }, uniquingKeysWith: { _, last in last })
-        let pluginEvents = await client.serverInfo?.supportsPlugins == true ? PluginEvents.subscription : []
+        let info = await client.serverInfo
+        let pluginEvents = info?.supportsPlugins == true ? PluginEvents.subscription : []
+        let profileEvents = info?.supportsAgentProfiles == true ? ["status.daemon_config_changed"] : []
         try await client.subscribeToSessionEvents([
             "agent_permission_request", "agent_permission_resolved", "agent_attention_required",
             "workspace_setup_progress",
-        ] + pluginEvents)
+        ] + pluginEvents + profileEvents)
+        // Profiles only fill a menu of new agents; don't hold up the connection for them.
+        if info?.supportsAgentProfiles == true {
+            Task {
+                do {
+                    let profiles = try await client.agentProfiles()
+                    if self.client === client { agentProfiles = profiles }
+                } catch {
+                    if self.client === client { lastError = "Agent profiles could not be loaded: \(error.localizedDescription)" }
+                }
+            }
+        } else {
+            agentProfiles = []
+        }
         // Terminal lists aren't needed to show the sidebar; don't hold up the connection for them.
         Task {
             await terminals.connect(client, workspaces: Array(workspaces.values))
@@ -350,6 +368,8 @@ final class AppModel {
             if connection.isConnected { connection = .connected(info) }
         case .pluginStatus(let status):
             plugins.handle(status)
+        case .daemonConfigChanged(let change):
+            agentProfiles = change.config.agentProfiles ?? []
         case .workspaceSetupProgress(let progress):
             setups[progress.workspaceId] = progress.snapshot
         case .disconnected(let reason):

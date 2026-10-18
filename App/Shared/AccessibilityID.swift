@@ -41,6 +41,7 @@ enum AccessibilityID {
         /// Shown until the first message is sent.
         static let placeholder = "newAgent.placeholder"
         static let workspace = "newAgent.workspace"
+        static let profile = "newAgent.profile"
         static let provider = "newAgent.provider"
         static let model = "newAgent.model"
         static let mode = "newAgent.mode"

@@ -53,4 +53,21 @@ final class NewAgentChatUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[prompt].firstMatch.waitForExistence(timeout: 30), "the new agent's chat shows the message")
         XCTAssertTrue(app.element(AccessibilityID.Composer.field).exists)
     }
+
+    func testProfileIsOfferedAndApplies() throws {
+        try LiveDaemon.requireProfiles()
+        let app = try openNewAgent(daemon: try LiveDaemon.require())
+
+        let picker = app.element(AccessibilityID.NewAgent.profile)
+        XCTAssertTrue(picker.waitForExistence(timeout: 10), "the daemon's profiles are offered")
+        picker.clickOrTap()
+        let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR title == %@",
+            "UI Test Profile", "UI Test Profile")).element(boundBy: 0)
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        item.clickOrTap()
+
+        let applied = NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "UI Test Profile", "UI Test Profile")
+        expectation(for: applied, evaluatedWith: picker)
+        waitForExpectations(timeout: 5)
+    }
 }

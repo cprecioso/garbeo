@@ -34,6 +34,14 @@ enum LiveDaemon {
         }
     }
 
+    /// Skips unless the daemon has the agent profile `with-test-daemon.sh` configures
+    /// (`PASEO_LIVE_PROFILES=1`): "UI Test Profile", for the claude provider.
+    static func requireProfiles() throws {
+        guard ProcessInfo.processInfo.environment["PASEO_LIVE_PROFILES"] == "1" else {
+            throw XCTSkip("Needs the agent profile \"UI Test Profile\"; set PASEO_LIVE_PROFILES=1 if it is configured")
+        }
+    }
+
     /// The workspace `with-test-daemon.sh` created (`PASEO_LIVE_WORKSPACE`), or skips the test.
     static func requireWorkspace() throws -> String {
         guard let id = ProcessInfo.processInfo.environment["PASEO_LIVE_WORKSPACE"], !id.isEmpty else {

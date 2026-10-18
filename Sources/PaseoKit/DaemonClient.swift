@@ -36,6 +36,7 @@ public enum DaemonEvent: Sendable {
     case serverInfo(ServerInfo)
     case terminalsChanged(TerminalsChanged)
     case pluginStatus(PluginStatusPayload)
+    case daemonConfigChanged(DaemonConfigChanged)
     case workspaceSetupProgress(WorkspaceSetupProgress)
     case disconnected(String?)
 }
@@ -298,6 +299,8 @@ public actor DaemonClient {
         case "status" where message.payload?.status == "server_info": decode(ServerInfo.self).map(DaemonEvent.serverInfo)
         case "terminals_changed": decode(TerminalsChanged.self).map(DaemonEvent.terminalsChanged)
         case "workspace_setup_progress": decode(WorkspaceSetupProgress.self).map(DaemonEvent.workspaceSetupProgress)
+        case "status" where message.payload?.status == "daemon_config_changed":
+            decode(DaemonConfigChanged.self).map(DaemonEvent.daemonConfigChanged)
         case "status" where message.payload?.status?.hasPrefix("plugin_") == true:
             decode(PluginStatusPayload.self).map(DaemonEvent.pluginStatus)
         default: nil
@@ -501,11 +504,14 @@ extension DaemonClient {
         public var model: String?
         public var modeId: String?
         public var thinkingOptionId: String?
+        /// Provider-specific feature values (from an agent profile).
+        public var featureValues: [String: JSONValue]?
         public var prompt: String
 
         public init(
             provider: String, cwd: String, workspaceId: String? = nil, model: String? = nil,
-            modeId: String? = nil, thinkingOptionId: String? = nil, prompt: String
+            modeId: String? = nil, thinkingOptionId: String? = nil, featureValues: [String: JSONValue]? = nil,
+            prompt: String
         ) {
             self.provider = provider
             self.cwd = cwd
@@ -513,6 +519,7 @@ extension DaemonClient {
             self.model = model
             self.modeId = modeId
             self.thinkingOptionId = thinkingOptionId
+            self.featureValues = featureValues
             self.prompt = prompt
         }
 
@@ -522,6 +529,7 @@ extension DaemonClient {
             if let model { config["model"] = .string(model) }
             if let modeId { config["modeId"] = .string(modeId) }
             if let thinkingOptionId { config["thinkingOptionId"] = .string(thinkingOptionId) }
+            if let featureValues, !featureValues.isEmpty { config["featureValues"] = .object(featureValues) }
             var message: [String: JSONValue] = [
                 "type": "create_agent_request",
                 "config": .object(config),

@@ -2,10 +2,10 @@ import Foundation
 import PaseoKit
 @testable import Garbeo
 
-/// An in-memory daemon for tests: one project with two workspaces, two providers, and agents
-/// created on request. Answers every request (unknown ones with an empty response) so the app
-/// connects and runs as it would against a real daemon. Connect an `AppModel` to it through
-/// `transportFactory`.
+/// An in-memory daemon for tests: one project with two workspaces, two providers, two agent
+/// profiles, and agents created on request. Answers every request (unknown ones with an empty
+/// response) so the app connects and runs as it would against a real daemon. Connect an `AppModel`
+/// to it through `transportFactory`.
 actor FakeDaemon: DaemonTransport {
     static let projectRoot = "/tmp/garbeo-fake/garbeo"
 
@@ -19,6 +19,12 @@ actor FakeDaemon: DaemonTransport {
     var createAgentError: String?
     /// Fails archiving workspaces with this error instead.
     var archiveWorkspaceError: String?
+    /// The `agentProfiles` of the daemon's config.
+    private(set) var agentProfiles: JSONValue = [
+        ["id": "profile_deep", "name": "Deep", "color": "violet", "icon": "brain", "provider": "claude",
+         "model": "opus-fake", "modeId": "plan", "thinkingOptionId": "high"],
+        ["id": "profile_fast", "name": "Fast", "provider": "codex", "featureValues": ["fast_mode": true]],
+    ]
     private var inbox: [TransportMessage] = []
     private var waiters: [CheckedContinuation<TransportMessage, Error>] = []
     private var closed = false
@@ -28,6 +34,14 @@ actor FakeDaemon: DaemonTransport {
     func failAgentCreation(_ error: String?) { createAgentError = error }
 
     func failWorkspaceArchiving(_ error: String?) { archiveWorkspaceError = error }
+
+    /// Replaces the configured profiles and announces it, as when they're edited in another client.
+    func setAgentProfiles(_ profiles: JSONValue) {
+        agentProfiles = profiles
+        deliver(["type": "session", "message": ["type": "status", "payload": [
+            "status": "daemon_config_changed", "config": ["agentProfiles": profiles],
+        ]]])
+    }
 
     // MARK: DaemonTransport
 
@@ -42,7 +56,7 @@ actor FakeDaemon: DaemonTransport {
         case "hello":
             deliver(["type": "session", "message": ["type": "status", "payload": [
                 "status": "server_info", "serverId": "srv_fake", "hostname": "Fake Daemon", "version": "0.0.0",
-                "protocolVersion": 1, "features": [:],
+                "protocolVersion": 1, "features": ["agentProfiles": true],
             ]]])
         case "ping":
             deliver(["type": "pong"])
@@ -109,6 +123,9 @@ actor FakeDaemon: DaemonTransport {
         case "list_provider_modes_request":
             responseType = "list_provider_modes_response"
             payload["modes"] = [["id": "default", "label": "Ask"], ["id": "plan", "label": "Plan"]]
+        case "get_daemon_config_request":
+            responseType = "get_daemon_config_response"
+            payload["config"] = ["agentProfiles": agentProfiles]
         case "create_agent_request":
             responseType = "status"
             createdAgents.append(.object(request))
