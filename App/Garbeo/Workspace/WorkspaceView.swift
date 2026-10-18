@@ -43,28 +43,17 @@ struct WorkspaceView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Section("Agents") {
-                        ForEach(agents.filter(model.isWorkspaceRoot)) { agent in
-                            Button(agent.displayTitle) { tabs.open(.agent(AgentTab(agentId: agent.id))) }
-                        }
-                    }
-                    let subagents = agents.filter { !model.isWorkspaceRoot($0) }
-                    if !subagents.isEmpty {
-                        Section("Subagents") {
-                            ForEach(subagents) { agent in
-                                Button(agent.displayTitle) { tabs.open(.agent(AgentTab(agentId: agent.id))) }
+                    ForEach(openTabMenu(agents: agents, terminals: terminals)) { section in
+                        Section(section.title) {
+                            ForEach(section.entries) { entry in
+                                if let systemImage = entry.systemImage {
+                                    Button(entry.title, systemImage: systemImage, action: entry.action)
+                                } else {
+                                    Button(entry.title, action: entry.action)
+                                }
                             }
                         }
                     }
-                    Section("Terminals") {
-                        ForEach(terminals) { terminal in
-                            Button(terminal.displayName) { tabs.open(workspace.tab(for: terminal)) }
-                        }
-                        Button("New Terminal", systemImage: "apple.terminal") {
-                            Task { await model.terminals.create(in: workspace) }
-                        }
-                    }
-                    PluginWorkspaceMenuItems(workspaceId: workspace.id, opensTabs: true)
                 } label: {
                     Label("Open Tab", systemImage: "plus.rectangle.on.rectangle")
                 }
@@ -130,7 +119,8 @@ struct WorkspaceView: View {
             // ⌘T shows the Open Tab menu.
             guard workspaceId == workspace.id else { return }
             model.commandCenter.openTabMenuWorkspaceId = nil
-            Task { Self.pressOpenTabMenu() }
+            let sections = openTabMenu(agents: agents, terminals: terminals)
+            Task { OpenTabSection.popUp(sections) }
         }
         .onChange(of: model.plugins.tabRequest, initial: true) { _, request in
             // Plugin panels for this workspace (from menus, commands or plugin code) open as tabs.
@@ -155,16 +145,32 @@ struct WorkspaceView: View {
         }
     }
 
-    /// SwiftUI can't open a `Menu` from code, so this presses the key window's Open Tab toolbar
-    /// button the way VoiceOver would.
-    private static func pressOpenTabMenu() {
-        func find(in element: Any) -> NSAccessibilityProtocol? {
-            guard let element = element as? NSAccessibilityProtocol else { return nil }
-            if element.accessibilityIdentifier() == AccessibilityID.Workspace.openTabMenu { return element }
-            return element.accessibilityChildren()?.lazy.compactMap { find(in: $0) }.first
+    /// The Open Tab menu's entries, for the toolbar menu and ⌘T.
+    private func openTabMenu(agents: [Agent], terminals: [TerminalInfo]) -> [OpenTabSection] {
+        func agentEntries(_ agents: [Agent]) -> [OpenTabSection.Entry] {
+            agents.map { agent in .init(id: agent.id, title: agent.displayTitle) { tabs.open(.agent(AgentTab(agentId: agent.id))) } }
         }
-        guard let window = NSApp.keyWindow, let menu = find(in: window) else { return }
-        _ = menu.accessibilityPerformPress()
+        var sections = [OpenTabSection(title: "Agents", entries: agentEntries(agents.filter(model.isWorkspaceRoot)))]
+        let subagents = agents.filter { !model.isWorkspaceRoot($0) }
+        if !subagents.isEmpty {
+            sections.append(OpenTabSection(title: "Subagents", entries: agentEntries(subagents)))
+        }
+        sections.append(OpenTabSection(title: "Terminals", entries: terminals.map { terminal in
+            .init(id: terminal.id, title: terminal.displayName) { tabs.open(workspace.tab(for: terminal)) }
+        } + [.init(id: "new-terminal", title: "New Terminal", systemImage: "apple.terminal") {
+            Task { await model.terminals.create(in: workspace) }
+        }]))
+        let plugins = model.plugins
+        let panels = PluginWorkspaceMenu(plugins.contributions, opensTabs: true).panels
+        if !panels.isEmpty {
+            sections.append(OpenTabSection(title: "Plugins", entries: panels.map { entry in
+                let (pluginId, panel) = (entry.pluginId, entry.item)
+                return .init(id: entry.id, title: panel.title, systemImage: LucideSymbols.symbol(for: panel.icon)) {
+                    plugins.open(.panel(pluginId: pluginId, panelId: panel.id, workspaceId: workspace.id))
+                }
+            }))
+        }
+        return sections
     }
 
     /// Subagents open in a tab here that the daemon doesn't know this client shows.
@@ -177,6 +183,52 @@ struct WorkspaceView: View {
         }
         .sorted()
     }
+}
+
+/// A section of the Open Tab menu.
+private struct OpenTabSection: Identifiable {
+    struct Entry: Identifiable {
+        let id: String
+        let title: String
+        var systemImage: String?
+        let action: @MainActor () -> Void
+    }
+
+    let title: String
+    let entries: [Entry]
+    var id: String { title }
+
+    /// SwiftUI can't open a `Menu` from code, so ⌘T pops up the same entries as an `NSMenu` under
+    /// the key window's Open Tab toolbar item.
+    @MainActor static func popUp(_ sections: [OpenTabSection]) {
+        guard let window = NSApp.keyWindow, let view = window.toolbar?.items.first(where: { $0.label == "Open Tab" })?.view
+        else { return }
+        let menu = NSMenu()
+        for section in sections {
+            menu.addItem(.sectionHeader(title: section.title))
+            for entry in section.entries {
+                let item = ActionMenuItem(title: entry.title, action: entry.action)
+                item.image = entry.systemImage.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+                menu.addItem(item)
+            }
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.isFlipped ? view.bounds.maxY : 0), in: view)
+    }
+}
+
+@MainActor
+private final class ActionMenuItem: NSMenuItem {
+    private let handler: @MainActor () -> Void
+
+    init(title: String, action: @escaping @MainActor () -> Void) {
+        handler = action
+        super.init(title: title, action: #selector(run), keyEquivalent: "")
+        target = self
+    }
+
+    required init(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    @objc private func run() { handler() }
 }
 
 extension Workspace {
