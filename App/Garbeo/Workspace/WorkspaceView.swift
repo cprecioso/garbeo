@@ -126,6 +126,12 @@ struct WorkspaceView: View {
                 break
             }
         }
+        .onChange(of: model.commandCenter.openTabMenuWorkspaceId) { _, workspaceId in
+            // ⌘T shows the Open Tab menu.
+            guard workspaceId == workspace.id else { return }
+            model.commandCenter.openTabMenuWorkspaceId = nil
+            Task { Self.pressOpenTabMenu() }
+        }
         .onChange(of: model.plugins.tabRequest, initial: true) { _, request in
             // Plugin panels for this workspace (from menus, commands or plugin code) open as tabs.
             guard let request, case .panel(_, let workspaceId, _) = request.kind, workspaceId == workspace.id else { return }
@@ -147,6 +153,18 @@ struct WorkspaceView: View {
             await content.kind.close(in: model) { tabs.close(content) }
             closing.remove(content)
         }
+    }
+
+    /// SwiftUI can't open a `Menu` from code, so this presses the key window's Open Tab toolbar
+    /// button the way VoiceOver would.
+    private static func pressOpenTabMenu() {
+        func find(in element: Any) -> NSAccessibilityProtocol? {
+            guard let element = element as? NSAccessibilityProtocol else { return nil }
+            if element.accessibilityIdentifier() == AccessibilityID.Workspace.openTabMenu { return element }
+            return element.accessibilityChildren()?.lazy.compactMap { find(in: $0) }.first
+        }
+        guard let window = NSApp.keyWindow, let menu = find(in: window) else { return }
+        _ = menu.accessibilityPerformPress()
     }
 
     /// Subagents open in a tab here that the daemon doesn't know this client shows.

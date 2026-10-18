@@ -30,6 +30,8 @@ final class CommandCenter {
     var showingNewProject = false
     /// The workspace whose archive confirmation is shown, see `AppModel.requestArchive(_:)`.
     var workspaceToArchive: Workspace?
+    /// The workspace whose Open Tab menu ⌘T asks to show (macOS), see `WorkspaceView`.
+    var openTabMenuWorkspaceId: String?
     /// Recently activated palette rows, newest first; they lead the list before anything is typed.
     private(set) var recentIds: [String] = UserDefaults.app.stringArray(forKey: "commandCenterRecents") ?? []
 
@@ -64,8 +66,9 @@ extension AppModel {
                 keywords: ["create", "add", "directory", "folder", "repository"], isEnabled: connected
             ) { center.showingNewProject = true },
             AppCommand(
-                id: "new-terminal", title: Self.newTerminalTitle, systemImage: "apple.terminal", menu: .file,
-                shortcut: KeyboardShortcut("t"), keywords: ["shell", "create", "tab"], isEnabled: connected && workspace != nil
+                id: "new-tab", title: Self.newTabTitle, systemImage: Self.newTabSystemImage, menu: .file,
+                shortcut: KeyboardShortcut("t"), keywords: ["shell", "terminal", "agent", "create", "open", "tab"],
+                isEnabled: connected && workspace != nil
             ) {
                 guard let workspace else { return }
                 Task { await self.openNewTab(in: workspace) }
@@ -113,12 +116,20 @@ extension AppModel {
         return commands
     }
 
-    /// ⌘T opens the terminal as a workspace tab on macOS, and in the detail on iOS.
-    private static var newTerminalTitle: String {
+    /// ⌘T shows the workspace's Open Tab menu on macOS, and opens a new terminal in the detail on iOS.
+    private static var newTabTitle: String {
         #if os(macOS)
-        "New Terminal Tab"
+        "New Tab…"
         #else
         "New Terminal"
+        #endif
+    }
+
+    private static var newTabSystemImage: String {
+        #if os(macOS)
+        "plus.rectangle.on.rectangle"
+        #else
+        "apple.terminal"
         #endif
     }
 

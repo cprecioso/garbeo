@@ -3,7 +3,7 @@ import PaseoKit
 import Testing
 @testable import Garbeo
 
-/// ⌘T (#38): a new terminal tab in the focused window's workspace.
+/// ⌘T (#38): the Open Tab menu of the focused window's workspace (macOS), or a new terminal there (iOS).
 @MainActor
 @Suite struct NewTabTests {
     @Test func targetsTheSelectionsWorkspace() throws {
@@ -19,6 +19,20 @@ import Testing
         #expect(model.selectedWorkspace?.id == "wks_b")
     }
 
+    #if os(macOS)
+    @Test func asksTheWorkspaceToShowItsOpenTabMenu() async throws {
+        let model = AppModel()
+        let target = try workspace("wks_b")
+        model.handle(.workspaceUpdate(.upsert(try workspace("wks_a"))))
+        model.handle(.workspaceUpdate(.upsert(target)))
+        model.selection = .workspace("wks_a")
+
+        await model.openNewTab(in: target)
+
+        #expect(model.commandCenter.openTabMenuWorkspaceId == "wks_b")
+        #expect(model.selection == .workspace("wks_a"))
+    }
+    #else
     @Test func createsATerminalInTheWorkspaceAndSelectsIt() async throws {
         let daemon = FakeTerminalDaemon()
         let client = DaemonClient(
@@ -43,6 +57,7 @@ import Testing
         #expect(model.selectedWorkspace?.id == "wks_b")
         #expect(model.lastError == nil)
     }
+    #endif
 }
 
 private func workspace(_ id: String) throws -> Workspace {
@@ -57,6 +72,7 @@ private func agent(_ id: String, in workspaceId: String) throws -> Agent {
     """.utf8))
 }
 
+#if os(iOS)
 /// An in-memory daemon: answers the hello and the terminal requests, and records every request.
 private final class FakeTerminalDaemon: DaemonTransport, @unchecked Sendable {
     private let lock = NSLock()
@@ -112,3 +128,4 @@ private final class FakeTerminalDaemon: DaemonTransport, @unchecked Sendable {
         inbound.continuation.yield(.text(String(decoding: data, as: UTF8.self)))
     }
 }
+#endif
