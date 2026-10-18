@@ -142,7 +142,8 @@ struct AgentFields: View {
     }
 }
 
-/// Applies one of the daemon's agent profiles to `draft`, and shows the one its settings still match.
+/// Applies one of the daemon's agent profiles to `draft`, and shows the one its settings still match,
+/// tinted with its color.
 struct AgentProfilePicker: View {
     let draft: AgentDraft
     let profiles: [AgentProfile]
@@ -153,16 +154,15 @@ struct AgentProfilePicker: View {
         Picker("Profile", selection: selection) {
             Text(noneLabel).tag(String?.none)
             Divider()
+            // A plain title and symbol: menus draw item icons uncolored, and on iOS a custom icon view
+            // becomes the item's accessibility label.
             ForEach(profiles) { profile in
-                Label {
-                    Text(profile.name)
-                } icon: {
-                    Image(systemName: profile.symbolName).foregroundStyle(profile.tint ?? .secondary)
-                }
-                .tag(Optional(profile.id))
+                Label(profile.name, systemImage: profile.symbolName).tag(Optional(profile.id))
             }
         }
+        .tint(draft.profile?.tint)
         .help(draft.profile?.notes ?? "Start the agent from a saved profile")
+        .accessibilityValue(draft.profile?.name ?? noneLabel)
         .accessibilityIdentifier(AccessibilityID.NewAgent.profile)
     }
 
