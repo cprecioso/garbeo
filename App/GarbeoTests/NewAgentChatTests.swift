@@ -14,6 +14,27 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
     return (model, daemon)
 }
 
+/// The chat `startNewAgent` just opened: a workspace tab on macOS, the detail elsewhere.
+@MainActor
+private func openedChat(_ model: AppModel) throws -> NewAgentChat {
+    #if os(macOS)
+    let tab = try #require(model.newAgentTabRequest)
+    return try #require(model.newAgentTabs[tab.chatId])
+    #else
+    return try #require(model.newAgent)
+    #endif
+}
+
+/// Whether `chat` is still on screen.
+@MainActor
+private func isOpen(_ chat: NewAgentChat, in model: AppModel) -> Bool {
+    #if os(macOS)
+    model.newAgentTabs[chat.id] === chat
+    #else
+    model.selection == .newAgent && model.newAgent === chat
+    #endif
+}
+
 @MainActor @Suite struct NewAgentChatTests {
     @Test func opensChatInSelectedWorkspaceWithoutCreatingAgent() async throws {
         let (model, daemon) = try await connectedModel()
@@ -21,8 +42,8 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
 
         model.startNewAgent()
 
-        #expect(model.selection == .newAgent)
-        let chat = try #require(model.newAgent)
+        let chat = try openedChat(model)
+        #expect(isOpen(chat, in: model))
         #expect(chat.destination == .workspace("ws_feature"))
         #expect(chat.worktree.projectId == "proj_garbeo")
         #expect(chat.cwd(in: model) == "/tmp/garbeo-fake/worktrees/feature")
@@ -32,13 +53,64 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
     @Test func defaultsToMostRecentWorkspace() async throws {
         let (model, _) = try await connectedModel()
         model.startNewAgent()
-        #expect(model.newAgent?.destination == .workspace("ws_main"))
+        #expect(try openedChat(model).destination == .workspace("ws_main"))
     }
 
+    #if os(macOS)
+    @Test func opensAsTabOfItsWorkspace() async throws {
+        let (model, _) = try await connectedModel()
+        model.selection = .workspace("ws_main")
+        let feature = try #require(model.workspaces["ws_feature"])
+
+        model.startNewAgent(in: feature)
+
+        let tab = try #require(model.newAgentTabRequest)
+        #expect(tab.workspaceId == "ws_feature")
+        #expect(model.selection == .workspace("ws_feature"))
+        #expect(model.newAgent == nil)
+    }
+
+    @Test func eachNewAgentOpensAnotherTab() async throws {
+        let (model, _) = try await connectedModel()
+        model.selection = .workspace("ws_main")
+        model.startNewAgent()
+        let first = try openedChat(model)
+        model.startNewAgent()
+        let second = try openedChat(model)
+
+        #expect(first !== second)
+        #expect(isOpen(first, in: model) && isOpen(second, in: model))
+    }
+
+    @Test func closingTabDropsChat() async throws {
+        let (model, _) = try await connectedModel()
+        model.startNewAgent()
+        let chat = try openedChat(model)
+        let tab = NewAgentTab(chatId: chat.id, workspaceId: "ws_main")
+        #expect(tab.label(in: model) != nil)
+
+        var closed = false
+        await tab.close(in: model) { closed = true }
+
+        #expect(closed)
+        #expect(!isOpen(chat, in: model))
+        #expect(tab.label(in: model) == nil, "The tab closes, and a restored layout drops it")
+    }
+
+    @Test func discardingWrittenMessageAsksFirst() async throws {
+        let (model, _) = try await connectedModel()
+        model.startNewAgent()
+        let chat = try openedChat(model)
+        let tab = NewAgentTab(chatId: chat.id, workspaceId: "ws_main")
+        #expect(tab.closeConfirmation(in: model) == nil)
+        chat.agent.prompt = "Half-written"
+        #expect(tab.closeConfirmation(in: model) != nil)
+    }
+    #else
     @Test func keepsOpenChatUnlessGivenWorkspace() async throws {
         let (model, _) = try await connectedModel()
         model.startNewAgent()
-        let chat = try #require(model.newAgent)
+        let chat = try openedChat(model)
         chat.agent.prompt = "Half-written"
 
         model.startNewAgent()
@@ -57,11 +129,12 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
         model.selection = .workspace("ws_main")
         #expect(model.newAgent == nil)
     }
+    #endif
 
     @Test func loadsSettingsFromDaemon() async throws {
         let (model, _) = try await connectedModel()
         model.startNewAgent()
-        let chat = try #require(model.newAgent)
+        let chat = try openedChat(model)
 
         await chat.agent.loadProviders(from: model)
         #expect(chat.agent.provider == "claude")
@@ -74,7 +147,7 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
     @Test func firstMessageCreatesAgentWithChosenSettings() async throws {
         let (model, daemon) = try await connectedModel()
         model.startNewAgent()
-        let chat = try #require(model.newAgent)
+        let chat = try openedChat(model)
         chat.agent.provider = "claude"
         chat.agent.modelId = "opus-fake"
         chat.agent.thinkingId = "high"
@@ -94,13 +167,13 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
         ])
         #expect(model.selection == .agent("agent_1"))
         #expect(model.agents["agent_1"]?.title == "Fix the login bug")
-        #expect(model.newAgent == nil)
+        #expect(!isOpen(chat, in: model))
     }
 
     @Test func incompleteChatDoesNotCreateAgent() async throws {
         let (model, daemon) = try await connectedModel()
         model.startNewAgent()
-        let chat = try #require(model.newAgent)
+        let chat = try openedChat(model)
         chat.agent.provider = "claude"
 
         chat.agent.prompt = "   "
@@ -111,14 +184,14 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
         await chat.send(in: model)
 
         #expect(await daemon.createdAgents.isEmpty)
-        #expect(model.selection == .newAgent)
+        #expect(isOpen(chat, in: model))
     }
 
     @Test func failedCreationKeepsMessage() async throws {
         let (model, daemon) = try await connectedModel()
         await daemon.failAgentCreation("Provider unavailable")
         model.startNewAgent()
-        let chat = try #require(model.newAgent)
+        let chat = try openedChat(model)
         chat.agent.provider = "claude"
         chat.agent.prompt = "Fix the login bug"
 
@@ -128,13 +201,13 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
         #expect(chat.agent.prompt == "Fix the login bug")
         #expect(!chat.isCreating)
         #expect(chat.sentMessage == nil)
-        #expect(model.selection == .newAgent)
+        #expect(isOpen(chat, in: model))
     }
 
     @Test func newWorktreeIsCreatedWithTheAgent() async throws {
         let (model, daemon) = try await connectedModel()
         model.startNewAgent()
-        let chat = try #require(model.newAgent)
+        let chat = try openedChat(model)
         chat.destination = .newWorktree
         chat.worktree.slug = "login-fix"
         chat.agent.provider = "claude"
@@ -150,5 +223,6 @@ private func connectedModel() async throws -> (AppModel, FakeDaemon) {
         #expect(agents.first?["workspaceId"] == "ws_login-fix")
         #expect(agents.first?["config"]?["cwd"] == "/tmp/garbeo-fake/worktrees/login-fix")
         #expect(model.selection == .agent("agent_1"))
+        #expect(!isOpen(chat, in: model))
     }
 }
