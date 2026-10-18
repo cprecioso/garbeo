@@ -35,6 +35,23 @@ final class NewAgentChatUITests: XCTestCase {
         XCTAssertFalse(app.element(AccessibilityID.Composer.send).isEnabled, "nothing to send yet")
     }
 
+    func testCommandNOpensChatAsWorkspaceTab() throws {
+        #if os(macOS)
+        let workspace = try LiveDaemon.requireWorkspace()
+        let app = XCUIApplication.launchForTesting(daemon: try LiveDaemon.require(), arguments: ["-PaseoSelectWorkspace", workspace])
+        let workspaceView = app.element(AccessibilityID.Workspace.view)
+        XCTAssertTrue(workspaceView.waitForExistence(timeout: 30))
+
+        app.typeKey("n", modifierFlags: .command)
+
+        XCTAssertTrue(app.element(AccessibilityID.NewAgent.placeholder).waitForExistence(timeout: 10))
+        XCTAssertTrue(workspaceView.exists, "the chat opens among the workspace's tabs, not instead of them")
+        XCTAssertTrue(app.element(AccessibilityID.Workspace.openTabMenu).exists)
+        #else
+        throw XCTSkip("Workspace tabs are macOS only")
+        #endif
+    }
+
     func testFirstMessageCreatesTheAgent() throws {
         let app = try openNewAgent(daemon: try LiveDaemon.requireThrowaway())
         let prompt = "Reply with exactly the single word: pong. Do not use any tools."

@@ -11,6 +11,7 @@ final class NewAgentChat {
         case newWorktree
     }
 
+    let id = UUID()
     var destination: Destination?
     var worktree = WorktreeDraft()
     /// Provider, model, thinking and mode; its prompt is the composer's text.
@@ -78,6 +79,7 @@ final class NewAgentChat {
             case nil:
                 break
             }
+            model.closeNewAgentTab(id)
         } catch {
             self.error = error.localizedDescription
             agent.prompt = prompt
@@ -92,8 +94,10 @@ final class NewAgentChat {
 struct NewAgentChatView: View {
     @Environment(AppModel.self) private var model
     let chat: NewAgentChat
+    /// `.window` drives the window's title; `.pane` (a workspace tab) leaves it to the workspace.
+    var chrome: AgentDetailView.Chrome = .window
 
-    var body: some View {
+    private var content: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 14) {
@@ -145,12 +149,21 @@ struct NewAgentChatView: View {
             }
             .padding()
         }
-        .navigationTitle("New Agent")
-        #if os(macOS)
-        .navigationSubtitle(chat.cwd(in: model).map { ($0 as NSString).abbreviatingWithTildeInPath } ?? "")
-        #else
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+    }
+
+    var body: some View {
+        switch chrome {
+        case .window:
+            content
+                .navigationTitle("New Agent")
+                #if os(macOS)
+                .navigationSubtitle(chat.cwd(in: model).map { ($0 as NSString).abbreviatingWithTildeInPath } ?? "")
+                #else
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+        case .pane:
+            content
+        }
     }
 
     private var canSend: Bool {

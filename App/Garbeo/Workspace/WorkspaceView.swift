@@ -111,7 +111,8 @@ struct WorkspaceView: View {
         } message: { pending in
             Text(pending.confirmation.message)
         }
-        .onChange(of: labels) { tabs.refreshLabels() }
+        // Initially too: a new agent tab whose agent started elsewhere closes on coming back.
+        .onChange(of: labels, initial: true) { tabs.refreshLabels() }
         .onChange(of: tabs.layout) { _, layout in tabs.layoutChanged(layout) }
         .onChange(of: model.selection, initial: true) { _, selection in
             // Selecting an agent or terminal (a new one, a debug launch flag) focuses (or opens) its tab.
@@ -131,6 +132,11 @@ struct WorkspaceView: View {
             guard let request, case .panel(_, let workspaceId, _) = request.kind, workspaceId == workspace.id else { return }
             model.plugins.tabRequest = nil
             tabs.open(.plugin(PluginTab(target: request)))
+        }
+        .onChange(of: model.newAgentTabRequest, initial: true) { _, tab in
+            guard let tab, tab.workspaceId == workspace.id else { return }
+            model.newAgentTabRequest = nil
+            tabs.open(.newAgent(tab))
         }
         .onChange(of: tabs.focusedContent) { _, content in
             // ...and the selection follows the focused tab (the sidebar highlights its workspace).
@@ -174,6 +180,7 @@ extension WorkspaceTabContent {
         case .agent(let tab): "agent:\(tab.agentId)"
         case .terminal(let tab): "terminal:\(tab.terminalId)"
         case .plugin(let tab): "plugin:\(tab.target.id)"
+        case .newAgent(let tab): "newAgent:\(tab.chatId)"
         }
     }
 }
@@ -259,7 +266,11 @@ private struct EmptyWorkspacePane: View {
                 }
             }
             HStack {
-                Button("New Agent") { model.startNewAgent(in: workspace) }
+                Button("New Agent") {
+                    // The new agent tab opens in the focused pane.
+                    tabs.controller.focusPane(paneId)
+                    model.startNewAgent(in: workspace)
+                }
                 if tabs.controller.allPaneIds.count > 1 {
                     Button("Close Pane") { tabs.controller.closePane(paneId) }
                 }
