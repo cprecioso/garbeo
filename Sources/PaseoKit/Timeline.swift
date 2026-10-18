@@ -244,14 +244,15 @@ public enum TimelineSection: Identifiable, Hashable, Sendable {
     }
 
     /// Groups every run of two or more consecutive activity rows. A lone activity row stays a row.
-    public static func sections(of rows: [TimelineRow]) -> [TimelineSection] {
+    /// While `isLive`, the trailing run is still in progress, so its rows stay ungrouped until it ends.
+    public static func sections(of rows: [TimelineRow], isLive: Bool = false) -> [TimelineSection] {
         var sections: [TimelineSection] = []
         var run: [TimelineRow] = []
-        func flush() {
-            if run.count > 1 {
+        func flush(isFinished: Bool = true) {
+            if run.count > 1, isFinished {
                 sections.append(.activity(id: "activity-\(run[0].id)", rows: run))
-            } else if let row = run.first {
-                sections.append(.row(row))
+            } else {
+                sections += run.map(TimelineSection.row)
             }
             run = []
         }
@@ -263,11 +264,13 @@ public enum TimelineSection: Identifiable, Hashable, Sendable {
                 sections.append(.row(row))
             }
         }
-        flush()
+        flush(isFinished: !isLive)
         return sections
     }
 }
 
 extension AgentTimeline {
-    public var sections: [TimelineSection] { TimelineSection.sections(of: rows) }
+    public var sections: [TimelineSection] { sections(isLive: false) }
+
+    public func sections(isLive: Bool) -> [TimelineSection] { TimelineSection.sections(of: rows, isLive: isLive) }
 }
