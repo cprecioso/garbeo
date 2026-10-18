@@ -72,7 +72,7 @@ extension AppModel {
             PaletteResult(
                 id: "workspace:\(workspace.id)", title: workspace.displayName, subtitle: workspace.projectName,
                 category: "Workspace",
-                systemImage: workspace.workspaceKind == "worktree" ? "arrow.triangle.branch" : "folder"
+                systemImage: workspace.isWorktree ? "arrow.triangle.branch" : "folder"
             ) { self.selection = .workspace(workspace.id) }
         }
         #endif

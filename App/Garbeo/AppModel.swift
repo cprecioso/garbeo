@@ -135,7 +135,8 @@ final class AppModel {
     }
 
     var projects: [ProjectGroup] {
-        let grouped = Dictionary(grouping: workspaces.values, by: \.projectId)
+        // Workspaces being archived (here or by another client) are already gone from the sidebar.
+        let grouped = Dictionary(grouping: workspaces.values.filter { $0.archivingAt == nil }, by: \.projectId)
         return grouped.map { projectId, workspaces in
             ProjectGroup(
                 id: projectId,
@@ -330,6 +331,7 @@ final class AppModel {
             workspaces[workspace.id] = workspace
             Task { await terminals.observe(workspace) }
         case .workspaceUpdate(.remove(let id)):
+            if selectedWorkspace?.id == id { selection = nil }
             workspaces[id] = nil
             setups[id] = nil
             terminals.forget(workspaceId: id)
@@ -453,6 +455,32 @@ final class AppModel {
     func archive(_ agentId: String) async {
         await perform { try await $0.archiveAgent(agentId: agentId) }
         if selectedAgentId == agentId { clearSelection() }
+    }
+
+    /// Archives `workspace`, first asking its `archiveConfirmation` if it has one.
+    func requestArchive(_ workspace: Workspace) {
+        if workspace.archiveConfirmation == nil {
+            Task { await archive(workspace) }
+        } else {
+            commandCenter.workspaceToArchive = workspace
+        }
+    }
+
+    /// Archives `workspace` without asking. It leaves the sidebar right away, and comes back if the
+    /// daemon fails to archive it.
+    func archive(_ workspace: Workspace) async {
+        guard let client else {
+            lastError = PaseoError.disconnected.localizedDescription
+            return
+        }
+        if selectedWorkspace?.id == workspace.id { selection = nil }
+        workspaces[workspace.id] = nil
+        do {
+            try await client.archiveWorkspace(workspaceId: workspace.id)
+        } catch {
+            if workspaces[workspace.id] == nil { workspaces[workspace.id] = workspace }
+            lastError = "Failed to archive workspace: \(error.localizedDescription)"
+        }
     }
 
     /// Clears the selection when its target goes away. On macOS its workspace stays open.

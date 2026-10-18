@@ -354,7 +354,7 @@ struct LiveAgentRoundTripTests {
 
     private func cleanUp(_ agent: Agent, client: DaemonClient, preexistingWorkspaces: Set<String>) async throws {
         if let workspaceId = agent.workspaceId, !preexistingWorkspaces.contains(workspaceId) {
-            _ = try await client.requestData(["type": "archive_workspace_request", "workspaceId": .string(workspaceId)])
+            try await client.archiveWorkspace(workspaceId: workspaceId)
         } else {
             try await client.archiveAgent(agentId: agent.id)
         }

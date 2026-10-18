@@ -13,8 +13,12 @@ actor FakeDaemon: DaemonTransport {
     private(set) var createdAgents: [JSONValue] = []
     /// The `create_paseo_worktree_request` messages received, oldest first.
     private(set) var createdWorktrees: [JSONValue] = []
+    /// The workspace IDs of the `archive_workspace_request` messages received, oldest first.
+    private(set) var archivedWorkspaces: [String] = []
     /// Fails agent creation with this error instead.
     var createAgentError: String?
+    /// Fails archiving workspaces with this error instead.
+    var archiveWorkspaceError: String?
     private var inbox: [TransportMessage] = []
     private var waiters: [CheckedContinuation<TransportMessage, Error>] = []
     private var closed = false
@@ -22,6 +26,8 @@ actor FakeDaemon: DaemonTransport {
     init() {}
 
     func failAgentCreation(_ error: String?) { createAgentError = error }
+
+    func failWorkspaceArchiving(_ error: String?) { archiveWorkspaceError = error }
 
     // MARK: DaemonTransport
 
@@ -121,6 +127,16 @@ actor FakeDaemon: DaemonTransport {
                 id: "ws_\(slug)", name: slug, directory: "/tmp/garbeo-fake/worktrees/\(slug)", kind: "worktree")
             payload["error"] = nil
             payload["setupTerminalId"] = nil
+        case "archive_workspace_request":
+            responseType = "archive_workspace_response"
+            let workspaceId = request["workspaceId"] ?? ""
+            archivedWorkspaces.append(workspaceId.stringValue ?? "")
+            payload["workspaceId"] = workspaceId
+            if let archiveWorkspaceError {
+                payload["error"] = .string(archiveWorkspaceError)
+            } else {
+                payload["archivedAt"] = "2026-10-17T10:10:00Z"
+            }
         case "fetch_agent_timeline_request":
             responseType = "fetch_agent_timeline_response"
             payload["agentId"] = request["agentId"] ?? ""
