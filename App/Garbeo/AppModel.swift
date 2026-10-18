@@ -567,9 +567,13 @@ final class AppModel {
         selection = .agent(agent.id)
     }
 
-    /// ⌘T: a new terminal in `workspace`, selected so it opens in a tab (macOS) or the detail (iOS).
+    /// ⌘T: shows `workspace`'s Open Tab menu (macOS), or opens a new terminal there in the detail (iOS).
     func openNewTab(in workspace: Workspace) async {
+        #if os(macOS)
+        commandCenter.openTabMenuWorkspaceId = workspace.id
+        #else
         await terminals.create(in: workspace)
+        #endif
     }
 
     /// Creates a worktree workspace and selects it. When `firstAgent` is given, also starts an agent
