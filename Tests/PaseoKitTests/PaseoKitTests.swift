@@ -253,6 +253,20 @@ private func tool(_ callId: String, status: String = "completed") -> String {
         #expect(flattened(sections) == input)
     }
 
+    @Test func liveTrailingRunStaysUngrouped() throws {
+        var timeline = AgentTimeline()
+        timeline.replace(with: try page("", endSeq: 0))
+        _ = timeline.apply(try stream(1, #"{"type":"reasoning","text":"Plan"}"#))
+        _ = timeline.apply(try stream(2, tool("c1")))
+        _ = timeline.apply(try stream(3, #"{"type":"assistant_message","text":"Reading more"}"#))
+        _ = timeline.apply(try stream(4, tool("c2")))
+        _ = timeline.apply(try stream(5, tool("c3", status: "running")))
+        #expect(timeline.sections(isLive: true).map(\.id) == ["activity-seq-1", "seq-3", "tool-c2", "tool-c3"])
+        #expect(timeline.sections(isLive: false).map(\.id) == ["activity-seq-1", "seq-3", "activity-tool-c2"])
+        _ = timeline.apply(try stream(6, #"{"type":"assistant_message","text":"Done"}"#))
+        #expect(timeline.sections(isLive: true).map(\.id) == ["activity-seq-1", "seq-3", "activity-tool-c2", "seq-6"])
+    }
+
     @Test func emptyTimelineHasNoSections() {
         #expect(TimelineSection.sections(of: []).isEmpty)
     }

@@ -225,15 +225,12 @@ private struct TimelineView: View {
                 } else if timeline.rows.isEmpty {
                     Text("No messages yet.").foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
                 }
-                let sections = timeline.sections
-                ForEach(sections) { section in
+                ForEach(timeline.sections(isLive: agent.status == .running)) { section in
                     switch section {
                     case .row(let row):
                         TimelineRowView(row: row, isExpanded: isExpanded(row.id))
                     case .activity(let id, let rows):
-                        ActivityGroup(
-                            rows: rows, isLive: agent.status == .running && section.id == sections.last?.id,
-                            isExpanded: isExpanded(id), isRowExpanded: isExpanded)
+                        ActivityGroup(rows: rows, isExpanded: isExpanded(id), isRowExpanded: isExpanded)
                     }
                 }
                 if agent.status == .running {
@@ -336,27 +333,20 @@ struct TimelineRowView: View {
     }
 }
 
-/// Consecutive reasoning and tool rows, collapsed into one row so the replies stand out.
+/// Consecutive reasoning and tool rows, collapsed into one row once finished so the replies stand out.
 struct ActivityGroup: View {
     let rows: [TimelineRow]
-    /// The agent is still working on this group: its latest step stays visible while collapsed.
-    let isLive: Bool
     @Binding var isExpanded: Bool
     let isRowExpanded: (String) -> Binding<Bool>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            CollapsibleRow(icon: "square.stack", title: Self.title(of: rows), subtitle: nil, tint: hasFailed ? .red : .secondary,
-                           trailing: statusView, accessibilityID: AccessibilityID.Timeline.activityGroup, isExpanded: $isExpanded)
-            {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(rows) { row in
-                        TimelineRowView(row: row, isExpanded: isRowExpanded(row.id))
-                    }
+        CollapsibleRow(icon: "square.stack", title: Self.title(of: rows), subtitle: nil, tint: hasFailed ? .red : .secondary,
+                       trailing: statusView, accessibilityID: AccessibilityID.Timeline.activityGroup, isExpanded: $isExpanded)
+        {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(rows) { row in
+                    TimelineRowView(row: row, isExpanded: isRowExpanded(row.id))
                 }
-            }
-            if isLive, !isExpanded, let latest = rows.last {
-                TimelineRowView(row: latest, isExpanded: isRowExpanded(latest.id)).padding(.leading, 22)
             }
         }
     }
